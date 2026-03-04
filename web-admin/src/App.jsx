@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LogOut, Building2, FileText, ClipboardList, Settings, Users, Plus, Edit2, Trash2, Eye, X, ChevronDown, ChevronRight } from 'lucide-react';
 
-const API_URL = 'http://localhost:3000/api';
+const API_URL = 'https://visatech-backend.onrender.com/api';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
