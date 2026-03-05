@@ -491,6 +491,98 @@ function SecaoCViewer({ secao, onEditPergunta, onDeletePergunta, onNovaPergunta 
   );
 }
 
+
+// ==================== SEÇÃO D VIEWER (grupos em abas) ====================
+
+const GRUPOS_D = [
+  { id: 'PLACAS',    label: 'Placas',     cor: 'teal' },
+  { id: 'AMBIENTES', label: 'Ambientes',  cor: 'teal' },
+  { id: 'DML',       label: 'DML',        cor: 'teal' },
+  { id: 'SANITÁRIOS',label: 'Sanitários', cor: 'teal' },
+];
+
+function SecaoDViewer({ secao, onEditPergunta, onDeletePergunta, onNovaPergunta }) {
+  const [grupoAtivo, setGrupoAtivo] = useState('PLACAS');
+
+  // Usa o prefixo antes do '|' na referencia_legal para agrupar
+  const perguntasDoGrupo = (grupoId) =>
+    (secao.perguntas || []).filter(p =>
+      p.referencia_legal?.startsWith(grupoId + '|')
+    );
+
+  // Extrai só a ref legal (parte após o '|')
+  const refLegal = (p) => p.referencia_legal?.split('|')[1] || p.referencia_legal;
+
+  const perguntas = perguntasDoGrupo(grupoAtivo);
+
+  return (
+    <div className="bg-white border-t border-teal-100">
+      {/* Abas dos grupos */}
+      <div className="flex border-b border-teal-100 bg-teal-50">
+        {GRUPOS_D.map(grupo => {
+          const count = perguntasDoGrupo(grupo.id).length;
+          return (
+            <button
+              key={grupo.id}
+              onClick={() => setGrupoAtivo(grupo.id)}
+              className={`flex-1 px-3 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+                grupoAtivo === grupo.id
+                  ? 'border-teal-600 text-teal-700 bg-white'
+                  : 'border-transparent text-gray-500 hover:text-teal-600'
+              }`}
+            >
+              {grupo.label}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${grupoAtivo === grupo.id ? 'bg-teal-100 text-teal-700' : 'bg-gray-200 text-gray-500'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Lista de perguntas do grupo ativo */}
+      <div className="p-4 space-y-2">
+        {perguntas.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-sm">Nenhuma pergunta neste grupo</div>
+        ) : (
+          perguntas.map((p, idx) => (
+            <div key={p.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 group hover:border-teal-200 transition-colors">
+              <span className="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                {idx + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 leading-snug">{p.texto}</p>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-medium">
+                    S / N / N/A / N/O
+                  </span>
+                  {refLegal(p) && (
+                    <span className="text-xs text-gray-400 italic">{refLegal(p)}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <button onClick={() => onEditPergunta(p)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Editar">
+                  <Edit2 size={13} />
+                </button>
+                <button onClick={() => onDeletePergunta(p.id)} className="p-1 text-red-400 hover:bg-red-50 rounded" title="Excluir">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+
+        <button
+          onClick={onNovaPergunta}
+          className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-teal-200 text-teal-600 rounded-lg hover:bg-teal-50 transition-colors text-sm font-medium mt-1">
+          <Plus size={15} /> Nova Pergunta nesta Seção
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ==================== CONFIGURAÇÃO SEÇÕES A e B ====================
 
 const SECOES_TEMPLATE = {
@@ -517,6 +609,14 @@ const SECOES_TEMPLATE = {
     bloqueante: false,
     exige_farmaceutico: false,
     descricao: 'Informações gerais, documentos, MBP, POPs e registros',
+  },
+  D: {
+    codigo: 'D',
+    titulo: 'EDIFICAÇÃO E INSTALAÇÕES FÍSICAS GERAIS',
+    tipo_secao: 'OBJETIVA',
+    bloqueante: false,
+    exige_farmaceutico: false,
+    descricao: 'Placas, ambientes, DML e sanitários',
   },
 };
 
@@ -581,6 +681,28 @@ const PERGUNTAS_TEMPLATE = {
     { texto: 'Capacitação – Uso e descarte dos EPIs de acordo com PGRSS', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
     { texto: 'Capacitação – Outro', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
     { texto: 'Tabela de treinamentos (Data / Carga Horária / Ministrante / Assinatura dos capacitados)', tipo_resposta: 'TABELA_TREINAMENTOS', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
+  ],
+  D: [
+    // PLACAS
+    { texto: 'Mantém em local visível ao público o Alvará Sanitário?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'PLACAS|Art.2 § 1º e § 2º da Resolução RDC 44/2009' },
+    { texto: 'Mantém em local visível ao público a CRT e o cartaz complementar de identificação conforme legislação?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'PLACAS|Art.2 § 1º e § 2º da Resolução RDC 44/2009' },
+    { texto: 'Possui avisos afixados quanto à proibição de uso de produtos fumígenos?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'PLACAS|Lei Estadual nº 13.541/09' },
+    { texto: 'Possui cartaz exposto em local visível: "Medicamentos podem causar efeitos indesejados. Evite a automedicação: Informe-se com o farmacêutico"?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'PLACAS|Art.41 da Resolução RDC 44/2009' },
+    { texto: 'Possui aviso afixado: "Proibida a exigência do CPF no ato da compra que condiciona a concessão de determinadas promoções"?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'PLACAS|Art. 135 da Lei 17.832/23' },
+    // AMBIENTES
+    { texto: 'Dispõe de local para guarda de pertences dos funcionários fora da área de vendas?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'AMBIENTES|Art.10 da Resolução RDC 44/2009' },
+    { texto: 'Possui os ambientes mínimos necessários à atividade?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'AMBIENTES|Art.5 da Resolução RDC 44/2009' },
+    { texto: 'A estrutura é compatível com as atividades desenvolvidas?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'AMBIENTES|Art.5 da Resolução RDC 44/2009' },
+    { texto: 'O acesso é independente, sem comunicação com residências e outros estabelecimentos?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'AMBIENTES|Art.23 da lei Federal 5991/73 c/c Art.13 da Resolução RDC 44/2009' },
+    { texto: 'As instalações internas estão em boas condições higiênicas e sanitárias e os ambientes estão protegidos contra a entrada de insetos e roedores?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'AMBIENTES|Art.6 da Resolução RDC 44/2009' },
+    { texto: 'O piso, parede e teto são lisos, impermeáveis, sem rachaduras e de fácil higienização?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'AMBIENTES|Art.6 da Resolução RDC 44/2009' },
+    { texto: 'A ventilação e a iluminação são compatíveis com as atividades desenvolvidas?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'AMBIENTES|Art.6 da Resolução RDC 44/2009' },
+    { texto: 'As dependências são utilizadas exclusivamente para as atividades licenciadas?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'AMBIENTES|Art.55 da lei federal 5991/73 c/c Art.90 da Resolução RDC 44/2009' },
+    { texto: 'Possui equipamentos de combate a incêndios na validade, pressurizados e em locais de fácil acesso?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'AMBIENTES|Art.6 § 4º da Resolução RDC 44/2009' },
+    // DML
+    { texto: 'Os materiais de limpeza de uso são regularizados na ANVISA e estão armazenados em local designado para tal?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'DML|Art.8 da Resolução RDC 44/2009' },
+    // SANITÁRIOS
+    { texto: 'O sanitário é de fácil acesso, com pia, água corrente, sabão líquido, lixeira e encontra-se em boas condições de limpeza e higiene?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'SANITÁRIOS|Art.9 da Resolução RDC 44/2009' },
   ],
 };
 
@@ -692,7 +814,7 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
     } catch { showToast('Erro ao excluir', 'error'); }
   };
 
-  const corSecao = (codigo) => codigo === 'A' ? 'blue' : codigo === 'B' ? 'orange' : 'purple';
+  const corSecao = (codigo) => codigo === 'A' ? 'blue' : codigo === 'B' ? 'orange' : codigo === 'C' ? 'purple' : 'teal';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
@@ -722,10 +844,10 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
               <span className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            ['A', 'B', 'C'].map((codigo) => {
+            ['A', 'B', 'C', 'D'].map((codigo) => {
               const secao = secoes.find(s => s.codigo === codigo);
               const cor = corSecao(codigo);
-              const corMap = { blue: { bg: 'bg-blue-600', light: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' }, orange: { bg: 'bg-orange-500', light: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' }, purple: { bg: 'bg-purple-600', light: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' } };
+              const corMap = { blue: { bg: 'bg-blue-600', light: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' }, orange: { bg: 'bg-orange-500', light: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' }, purple: { bg: 'bg-purple-600', light: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' }, teal: { bg: 'bg-teal-600', light: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-700' } };
               const c = corMap[cor];
 
               return (
@@ -839,6 +961,16 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
                   {/* Seção C: abas I–V */}
                   {secao && codigo === 'C' && expandida === 'C' && (
                     <SecaoCViewer
+                      secao={secao}
+                      onEditPergunta={(p) => setModalPergunta({ secaoId: secao.id, item: p })}
+                      onDeletePergunta={excluirPergunta}
+                      onNovaPergunta={() => setModalPergunta({ secaoId: secao.id, item: null })}
+                    />
+                  )}
+
+                  {/* Seção D: grupos em abas */}
+                  {secao && codigo === 'D' && expandida === 'D' && (
+                    <SecaoDViewer
                       secao={secao}
                       onEditPergunta={(p) => setModalPergunta({ secaoId: secao.id, item: p })}
                       onDeletePergunta={excluirPergunta}
