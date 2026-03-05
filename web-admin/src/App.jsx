@@ -835,7 +835,6 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
                       </div>
                     </div>
                   )}
-                </div>
 
                   {/* Seção C: abas I–V */}
                   {secao && codigo === 'C' && expandida === 'C' && (
@@ -846,6 +845,8 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
                       onNovaPergunta={() => setModalPergunta({ secaoId: secao.id, item: null })}
                     />
                   )}
+                </div>
+
               );
             })
           )}
