@@ -492,6 +492,205 @@ function SecaoCViewer({ secao, onEditPergunta, onDeletePergunta, onNovaPergunta 
 }
 
 
+
+// ==================== VIEWER GENÉRICO LISTA PLANA (E, F) ====================
+
+function SecaoListaViewer({ secao, cor, onEditPergunta, onDeletePergunta, onNovaPergunta }) {
+  const cores = {
+    rose:  { bg: 'bg-rose-100',  text: 'text-rose-700',  badge: 'bg-rose-50 text-rose-700',   border: 'border-rose-200',  btn: 'border-rose-200 text-rose-600 hover:bg-rose-50' },
+    amber: { bg: 'bg-amber-100', text: 'text-amber-700', badge: 'bg-amber-50 text-amber-700', border: 'border-amber-200', btn: 'border-amber-200 text-amber-600 hover:bg-amber-50' },
+  };
+  const c = cores[cor] || cores.rose;
+
+  const tipoLabel = (tipo) => {
+    if (tipo === 'SIM_NAO_NA_NO') return 'S / N / N/A / N/O';
+    if (tipo === 'SIM_NAO') return 'Sim / Não';
+    if (tipo === 'TEXTO') return 'Texto';
+    if (tipo === 'DATA') return 'Data';
+    return tipo;
+  };
+
+  return (
+    <div className={`bg-white border-t ${c.border}`}>
+      <div className="p-4 space-y-2">
+        {(secao.perguntas || []).length === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-sm">Nenhuma pergunta cadastrada</div>
+        ) : (
+          (secao.perguntas || []).map((p, idx) => (
+            <div key={p.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 group hover:border-gray-300 transition-colors">
+              <span className={`w-6 h-6 ${c.bg} ${c.text} rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5`}>
+                {idx + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 leading-snug">{p.texto}</p>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.badge}`}>
+                    {tipoLabel(p.tipo_resposta)}
+                  </span>
+                  {p.referencia_legal && (
+                    <span className="text-xs text-gray-400 italic">{p.referencia_legal}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <button onClick={() => onEditPergunta(p)} className="p-1 text-blue-500 hover:bg-blue-50 rounded"><Edit2 size={13} /></button>
+                <button onClick={() => onDeletePergunta(p.id)} className="p-1 text-red-400 hover:bg-red-50 rounded"><Trash2 size={13} /></button>
+              </div>
+            </div>
+          ))
+        )}
+        <button onClick={onNovaPergunta}
+          className={`w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-lg text-sm font-medium mt-1 ${c.btn}`}>
+          <Plus size={15} /> Nova Pergunta nesta Seção
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ==================== SEÇÃO G VIEWER ====================
+
+function SecaoGViewer({ secao, onEditPergunta, onDeletePergunta, onNovaPergunta }) {
+  const perguntas = secao.perguntas || [];
+
+  const tipoLabel = (tipo) => {
+    if (tipo === 'SIM_NAO_NA_NO') return 'S / N / N/A / N/O';
+    if (tipo === 'SIM_NAO') return 'Sim / Não';
+    if (tipo === 'CHECKBOXES') return 'Múltipla escolha';
+    return tipo;
+  };
+
+  const refLegal = (p) => {
+    const parts = p.referencia_legal?.split('|');
+    return parts && parts[1] ? parts[1] : '';
+  };
+
+  return (
+    <div className="bg-white border-t border-cyan-100">
+      <div className="p-4 space-y-2">
+        {perguntas.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-sm">Nenhuma pergunta cadastrada</div>
+        ) : (
+          perguntas.map((p, idx) => (
+            <div key={p.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 group hover:border-cyan-200 transition-colors">
+              <span className="w-6 h-6 bg-cyan-100 text-cyan-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                {idx + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 leading-snug">{p.texto}</p>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className="text-xs bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded-full font-medium">
+                    {tipoLabel(p.tipo_resposta)}
+                  </span>
+                  {refLegal(p) && <span className="text-xs text-gray-400 italic">{refLegal(p)}</span>}
+                </div>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <button onClick={() => onEditPergunta(p)} className="p-1 text-blue-500 hover:bg-blue-50 rounded"><Edit2 size={13} /></button>
+                <button onClick={() => onDeletePergunta(p.id)} className="p-1 text-red-400 hover:bg-red-50 rounded"><Trash2 size={13} /></button>
+              </div>
+            </div>
+          ))
+        )}
+        <button onClick={onNovaPergunta}
+          className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-cyan-200 text-cyan-600 rounded-lg hover:bg-cyan-50 transition-colors text-sm font-medium mt-1">
+          <Plus size={15} /> Nova Pergunta nesta Seção
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ==================== SEÇÃO H VIEWER (2 abas: Controle Especial + Balanços) ====================
+
+function SecaoHViewer({ secao, onEditPergunta, onDeletePergunta, onNovaPergunta }) {
+  const [abaAtiva, setAbaAtiva] = useState('CONTROLE');
+  const perguntas = secao.perguntas || [];
+
+  const grupos = [
+    { id: 'CONTROLE', label: 'Controle Especial' },
+    { id: 'BALANCO',  label: 'Balanços / SNGPC' },
+  ];
+
+  const perguntasDoGrupo = (grupoId) =>
+    perguntas.filter(p => p.referencia_legal?.startsWith(grupoId + '|'));
+
+  const refLegal = (p) => p.referencia_legal?.split('|')[1] || '';
+
+  const tipoLabel = (tipo) => {
+    if (tipo === 'SIM_NAO_NA_NO') return 'S / N / N/A / N/O';
+    if (tipo === 'TEXTO') return 'Texto';
+    if (tipo === 'DATA') return 'Data';
+    return tipo;
+  };
+
+  const lista = perguntasDoGrupo(abaAtiva);
+
+  return (
+    <div className="bg-white border-t border-indigo-100">
+      {/* Abas */}
+      <div className="flex border-b border-indigo-100 bg-indigo-50">
+        {grupos.map(g => {
+          const count = perguntasDoGrupo(g.id).length;
+          return (
+            <button key={g.id} onClick={() => setAbaAtiva(g.id)}
+              className={`flex-1 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center justify-center gap-1.5 ${
+                abaAtiva === g.id ? 'border-indigo-600 text-indigo-700 bg-white' : 'border-transparent text-gray-500 hover:text-indigo-600'
+              }`}>
+              {g.label}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${abaAtiva === g.id ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-200 text-gray-500'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="p-4 space-y-2">
+        {lista.length === 0 ? (
+          <div className="text-center py-6 text-gray-400 text-sm">Nenhuma pergunta neste grupo</div>
+        ) : (
+          lista.map((p, idx) => (
+            <div key={p.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 group hover:border-indigo-200 transition-colors">
+              <span className="w-6 h-6 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                {idx + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 leading-snug">{p.texto}</p>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                    {tipoLabel(p.tipo_resposta)}
+                  </span>
+                  {refLegal(p) && <span className="text-xs text-gray-400 italic">{refLegal(p)}</span>}
+                </div>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <button onClick={() => onEditPergunta(p)} className="p-1 text-blue-500 hover:bg-blue-50 rounded"><Edit2 size={13} /></button>
+                <button onClick={() => onDeletePergunta(p.id)} className="p-1 text-red-400 hover:bg-red-50 rounded"><Trash2 size={13} /></button>
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* Aviso sobre inventário */}
+        {abaAtiva === 'BALANCO' && (
+          <div className="flex items-start gap-2 p-3 bg-indigo-50 rounded-lg border border-indigo-100 mt-2">
+            <Info size={15} className="text-indigo-500 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-indigo-700">
+              <span className="font-semibold">Amostragem de Inventário</span> — a tabela de psicotrópicos/entorpecentes/antimicrobianos com estoque físico x escriturado é preenchida diretamente no app durante a inspeção.
+            </p>
+          </div>
+        )}
+
+        <button onClick={onNovaPergunta}
+          className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors text-sm font-medium mt-1">
+          <Plus size={15} /> Nova Pergunta nesta Seção
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ==================== SEÇÃO D VIEWER (grupos em abas) ====================
 
 const GRUPOS_D = [
@@ -618,6 +817,38 @@ const SECOES_TEMPLATE = {
     exige_farmaceutico: false,
     descricao: 'Placas, ambientes, DML e sanitários',
   },
+  E: {
+    codigo: 'E',
+    titulo: 'ARMAZENAGEM E EXPOSIÇÃO DOS PRODUTOS',
+    tipo_secao: 'OBJETIVA',
+    bloqueante: false,
+    exige_farmaceutico: false,
+    descricao: 'Condições de armazenagem e exposição de medicamentos',
+  },
+  F: {
+    codigo: 'F',
+    titulo: 'PRODUTOS',
+    tipo_secao: 'OBJETIVA',
+    bloqueante: false,
+    exige_farmaceutico: false,
+    descricao: 'Validade, rotulagem, procedência e conformidade dos produtos',
+  },
+  G: {
+    codigo: 'G',
+    titulo: 'PRESTAÇÃO DE SERVIÇOS FARMACÊUTICOS',
+    tipo_secao: 'MISTA',
+    bloqueante: false,
+    exige_farmaceutico: false,
+    descricao: 'Serviços oferecidos, estrutura e condições sanitárias',
+  },
+  H: {
+    codigo: 'H',
+    titulo: 'MEDICAMENTOS SUJEITOS A CONTROLE ESPECIAL',
+    tipo_secao: 'MISTA',
+    bloqueante: false,
+    exige_farmaceutico: false,
+    descricao: 'Escrituração, SNGPC, balanços e inventário',
+  },
 };
 
 const PERGUNTAS_TEMPLATE = {
@@ -703,6 +934,58 @@ const PERGUNTAS_TEMPLATE = {
     { texto: 'Os materiais de limpeza de uso são regularizados na ANVISA e estão armazenados em local designado para tal?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'DML|Art.8 da Resolução RDC 44/2009' },
     // SANITÁRIOS
     { texto: 'O sanitário é de fácil acesso, com pia, água corrente, sabão líquido, lixeira e encontra-se em boas condições de limpeza e higiene?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'SANITÁRIOS|Art.9 da Resolução RDC 44/2009' },
+  ],
+  E: [
+    { texto: 'Os produtos são armazenados em gavetas, prateleiras ou suporte equivalente, afastados do piso, parede e teto, a fim de permitir fácil limpeza e inspeção?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.35 e Art.36 da Resolução RDC 44/2009' },
+    { texto: 'Os medicamentos sujeitos a prescrição estão expostos em local de acesso restrito a funcionários?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.40 § 1º da Resolução RDC 44/2009' },
+    { texto: 'Existem termômetros calibrados em todas as áreas que têm estoque de medicamentos? (informar Nº da OS e Data)', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.39 da Resolução RDC 44/2009' },
+    { texto: 'A temperatura e umidade do ar são registradas diariamente?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: '' },
+    { texto: 'Comercializa medicamentos com necessidade de armazenagem entre 2ºC e 8ºC?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: '' },
+    { texto: 'Tais medicamentos encontram-se em condições adequadas de armazenagem?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.35 § 3º da Resolução RDC 44/2009' },
+    { texto: 'Existem termômetros calibrados nos refrigeradores de medicamentos? (informar Nº da OS e Data)', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.35 § 3º da Resolução RDC 44/2009' },
+    { texto: 'A temperatura deste(s) refrigerador(es) é registrada diariamente?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.35 § 3º da Resolução RDC 44/2009' },
+  ],
+  F: [
+    { texto: 'Os produtos pré-vencidos possuem tratamento diferenciado?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.38 da Resolução RDC 44/2009' },
+    { texto: 'Os produtos violados, vencidos, sob suspeita ou não conformes estão segregados e possuem destino adequado conforme Plano de Gerenciamento de Resíduos?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.38 da Resolução RDC 44/2009 c/c Resolução RDC 222/2018' },
+    { texto: 'Os produtos expostos para venda encontram-se na validade?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.8 da lei Federal 5991/73 c/c Art.38 da Resolução RDC 44/2009' },
+    { texto: 'Os medicamentos estão em suas embalagens originais e possuem registro no Ministério da Saúde?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.11 e Art.12 da Lei Federal 6360/76 c/c Art.30 da Resolução RDC 44/2009' },
+    { texto: 'Os produtos possuem rotulagem adequada (lote, validade, data de fabricação, regularidade junto ao órgão competente, nacionalização)?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.11 § 2º e Art.25 da Lei Federal 6360/76 c/c Art.30 e Art.34 da Resolução RDC 44/2009' },
+    { texto: 'Cumpre a proibição de vender medicamentos em embalagem hospitalar?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Resolução RDC 71/2009 e 768/2022' },
+    { texto: 'Cumpre a proibição de captar receitas médicas para manipular?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.1 da Lei Federal 11951/2009 c/c Art.50 da Resolução RDC 44/2009' },
+    { texto: 'Só adquire medicamentos de fornecedores qualificados e legalizados?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.31 da Resolução RDC 44/2009' },
+    { texto: 'Todos os produtos expostos à venda são permitidos ao ramo farmacêutico?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.5 § 1º da Lei Federal 5991/1973 c/c Art.29 da Resolução RDC 44/2009 c/c IN 09/2009' },
+    { texto: 'As ervas e plantas medicinais estão rotuladas e acondicionadas adequadamente?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'Art.7 da Lei Federal 5991/73' },
+    { texto: 'Observações', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: '' },
+  ],
+  G: [
+    { texto: 'Realiza prestação de serviços farmacêuticos?', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'GERAL|' },
+    { texto: 'Quais serviços? (Atenção farmacêutica domiciliar / Aferição de temperatura corporal / Aferição de pressão arterial / Perfuração de lóbulo auricular / Injetáveis)', tipo_resposta: 'CHECKBOXES', obrigatoria: false, referencia_legal: 'GERAL|' },
+    { texto: 'Possui declaração de prestação do serviço ofertado em duas vias?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'GERAL|' },
+    { texto: 'Existe local específico para a prestação de serviços farmacêuticos, diverso à dispensação e à circulação de pessoas?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'GERAL|Art.18 § 1º da Lei Federal 5991/1973 c/c Art.15 da Resolução RDC 44/2009' },
+    { texto: 'A sala é provida de pia com água corrente, sabonete líquido, toalhas descartáveis, álcool 70%, lixeira com pedal e tampa?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'GERAL|Art.15 § 2º da Resolução RDC 44/2009' },
+    { texto: 'Os perfuro-cortantes e contaminados são descartados em local adequado?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'GERAL|Art.73 e Art.83 da Resolução RDC 44/2009' },
+    { texto: 'A assepsia dos acessórios e equipamentos está dentro das normas?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'GERAL|Art.80 e Art.83 da Resolução RDC 44/2009' },
+    { texto: 'As agulhas, seringas e brincos estão na validade?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'GERAL|Art.38 § 1º da Resolução RDC 44/2009' },
+    { texto: 'Possui profissional habilitado e/ou capacitado para a aplicação de injetáveis?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'GERAL|' },
+    { texto: 'O local possui condições higiênico-sanitárias satisfatórias?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'GERAL|Art.18 da Lei Federal 5991/1973 c/c Art.15 § 1º e Art.16 § 1º da Resolução RDC 44/2009' },
+  ],
+  H: [
+    { texto: 'O estabelecimento está regularizado para tal comércio?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'CONTROLE|Art.49 da Resolução RDC 44/2009 e Resolução RDC 22/2014 c/c Portaria 344/1998' },
+    { texto: 'A guarda de medicamentos controlados atende à legislação vigente?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'CONTROLE|Art.67 da Portaria 344/1998 c/c Art.37 da Resolução RDC 44/2009' },
+    { texto: 'A escrituração está atualizada perante o SNGPC?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'CONTROLE|Art.10 da Resolução RDC 22/2014 e Resolução RDC 471/2021' },
+    { texto: 'A transmissão dos dados ao SNGPC é realizada nos intervalos estabelecidos em legislação? (7 dias)', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'CONTROLE|Art.10 § 3º e 4°, Art 11 e Art 12 §1° e 2° da Resolução RDC 22/2014' },
+    { texto: 'Os medicamentos são dispensados mediante retenção de receita?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'CONTROLE|Art.25, Art.52, Art.53, Art.54 e Art.55 da Portaria 344/1998 e Resolução RDC 20/2011' },
+    { texto: 'As prescrições e notificações de receitas obedecem às normas vigentes?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'CONTROLE|Art.35, Art.36, Art.52, Art.53 e Art.55 da Portaria 344/1998 c/c Resolução RDC 58/2007 c/c Resolução RDC 52/2011 e Resolução RDC 471/2021' },
+    { texto: 'A conferência das prescrições médicas é efetuada e dispensada pelo profissional farmacêutico?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'CONTROLE|Art.37 da Resolução CFF nº 357/2001' },
+    { texto: 'Os balanços são enviados nos prazos e ritos vigentes?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'CONTROLE|Art.69 da Portaria 344/1998' },
+    { texto: 'Os registros de entrada e saída conferem com o estoque físico?', tipo_resposta: 'SIM_NAO_NA_NO', obrigatoria: false, referencia_legal: 'CONTROLE|Art.64 da Portaria 344/1998 c/c Art.15 e Art.16 da Resolução RDC 22/2014 e Resolução RDC 20/2011' },
+    { texto: 'Possui escrituração digital (software)? Qual?', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'CONTROLE|' },
+    { texto: 'SNGPC – Período', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'BALANCO|' },
+    { texto: 'SNGPC – Data de transmissão', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'BALANCO|' },
+    { texto: 'Balanço RMNA – Protocolado em', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'BALANCO|' },
+    { texto: 'Balanço RMNB2 – Protocolado em', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'BALANCO|' },
+    { texto: 'Balanço BMPO – Protocolado em', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'BALANCO|' },
   ],
 };
 
@@ -814,7 +1097,8 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
     } catch { showToast('Erro ao excluir', 'error'); }
   };
 
-  const corSecao = (codigo) => codigo === 'A' ? 'blue' : codigo === 'B' ? 'orange' : codigo === 'C' ? 'purple' : 'teal';
+  const COR_SECAO = { A: 'blue', B: 'orange', C: 'purple', D: 'teal', E: 'rose', F: 'amber', G: 'cyan', H: 'indigo' };
+const corSecao = (codigo) => COR_SECAO[codigo] || 'blue';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
@@ -844,10 +1128,10 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
               <span className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            ['A', 'B', 'C', 'D'].map((codigo) => {
+            ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((codigo) => {
               const secao = secoes.find(s => s.codigo === codigo);
               const cor = corSecao(codigo);
-              const corMap = { blue: { bg: 'bg-blue-600', light: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' }, orange: { bg: 'bg-orange-500', light: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' }, purple: { bg: 'bg-purple-600', light: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' }, teal: { bg: 'bg-teal-600', light: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-700' } };
+              const corMap = { blue: { bg: 'bg-blue-600', light: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' }, orange: { bg: 'bg-orange-500', light: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' }, purple: { bg: 'bg-purple-600', light: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' }, teal: { bg: 'bg-teal-600', light: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-700' }, rose: { bg: 'bg-rose-600', light: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', badge: 'bg-rose-100 text-rose-700' }, amber: { bg: 'bg-amber-600', light: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-700' }, cyan: { bg: 'bg-cyan-600', light: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-700', badge: 'bg-cyan-100 text-cyan-700' }, indigo: { bg: 'bg-indigo-600', light: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-700' } };
               const c = corMap[cor];
 
               return (
@@ -971,6 +1255,48 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
                   {/* Seção D: grupos em abas */}
                   {secao && codigo === 'D' && expandida === 'D' && (
                     <SecaoDViewer
+                      secao={secao}
+                      onEditPergunta={(p) => setModalPergunta({ secaoId: secao.id, item: p })}
+                      onDeletePergunta={excluirPergunta}
+                      onNovaPergunta={() => setModalPergunta({ secaoId: secao.id, item: null })}
+                    />
+                  )}
+
+                  {/* Seção E: lista plana */}
+                  {secao && codigo === 'E' && expandida === 'E' && (
+                    <SecaoListaViewer
+                      secao={secao}
+                      cor="rose"
+                      onEditPergunta={(p) => setModalPergunta({ secaoId: secao.id, item: p })}
+                      onDeletePergunta={excluirPergunta}
+                      onNovaPergunta={() => setModalPergunta({ secaoId: secao.id, item: null })}
+                    />
+                  )}
+
+                  {/* Seção F: lista plana */}
+                  {secao && codigo === 'F' && expandida === 'F' && (
+                    <SecaoListaViewer
+                      secao={secao}
+                      cor="amber"
+                      onEditPergunta={(p) => setModalPergunta({ secaoId: secao.id, item: p })}
+                      onDeletePergunta={excluirPergunta}
+                      onNovaPergunta={() => setModalPergunta({ secaoId: secao.id, item: null })}
+                    />
+                  )}
+
+                  {/* Seção G: grupos */}
+                  {secao && codigo === 'G' && expandida === 'G' && (
+                    <SecaoGViewer
+                      secao={secao}
+                      onEditPergunta={(p) => setModalPergunta({ secaoId: secao.id, item: p })}
+                      onDeletePergunta={excluirPergunta}
+                      onNovaPergunta={() => setModalPergunta({ secaoId: secao.id, item: null })}
+                    />
+                  )}
+
+                  {/* Seção H: grupos */}
+                  {secao && codigo === 'H' && expandida === 'H' && (
+                    <SecaoHViewer
                       secao={secao}
                       onEditPergunta={(p) => setModalPergunta({ secaoId: secao.id, item: p })}
                       onDeletePergunta={excluirPergunta}
