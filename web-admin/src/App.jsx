@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Building2, FileText, ClipboardList, Plus, Eye, X, Edit2, Trash2, Check, AlertTriangle } from 'lucide-react';
+import { LogOut, Building2, FileText, ClipboardList, Plus, Eye, X, Edit2, Trash2, Check, AlertTriangle, ChevronUp, ChevronDown, Info } from 'lucide-react';
 
 const API_URL = 'https://visatech-backend.onrender.com/api';
 
@@ -363,6 +363,401 @@ function ModalRoteiro({ item, estabelecimentos, onSave, onClose }) {
   );
 }
 
+
+// ==================== CONFIGURAÇÃO SEÇÕES A e B ====================
+
+const SECOES_TEMPLATE = {
+  A: {
+    codigo: 'A',
+    titulo: 'IDENTIFICAÇÃO DA EMPRESA / ESTABELECIMENTO',
+    tipo_secao: 'IDENTIFICACAO',
+    bloqueante: false,
+    exige_farmaceutico: false,
+    descricao: 'Dados de identificação do estabelecimento inspecionado',
+  },
+  B: {
+    codigo: 'B',
+    titulo: 'RESPONSABILIDADE TÉCNICA',
+    tipo_secao: 'VALIDACAO',
+    bloqueante: true,
+    exige_farmaceutico: true,
+    descricao: 'Validação da presença do farmacêutico responsável técnico',
+  },
+};
+
+const PERGUNTAS_TEMPLATE = {
+  B: [
+    { texto: 'Existe responsável técnico no estabelecimento inscrito no CRF?', tipo_resposta: 'SIM_NAO', obrigatoria: true, referencia_legal: 'Art.15 da lei Federal 5991/73 c/c Art.3º da Resolução RDC 44/2009' },
+    { texto: 'Farmacêutico presente desde o início da inspeção?', tipo_resposta: 'SIM_NAO', obrigatoria: true, referencia_legal: 'Art.15 § 1º e 2º da Lei Federal 5991/73 c/c Art.3º da Resolução RDC 44/2009' },
+    { texto: 'O farmacêutico está identificado de modo distinto dos demais funcionários?', tipo_resposta: 'SIM_NAO', obrigatoria: true, referencia_legal: 'Art.17, parágrafo único da Resolução RDC 44/2009' },
+  ],
+};
+
+const TIPO_RESPOSTA_LABELS = {
+  SIM_NAO: 'Sim / Não',
+  SIM_NAO_NA_NO: 'S / N / N/A / N/O',
+  TEXTO: 'Texto livre',
+  DATA: 'Data',
+  NUMERO: 'Número',
+};
+
+function GerenciarSecoes({ roteiro, token, onClose }) {
+  const [secoes, setSecoes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expandida, setExpandida] = useState(null);
+  const [modalPergunta, setModalPergunta] = useState(null); // { secaoId, item }
+  const [salvandoSecao, setSalvandoSecao] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const API_URL = 'https://visatech-backend.onrender.com/api';
+  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  useEffect(() => { carregarSecoes(); }, []);
+
+  const carregarSecoes = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`${API_URL}/questionarios/${roteiro.id}/secoes`, { headers });
+      setSecoes(await r.json());
+    } catch { showToast('Erro ao carregar seções', 'error'); }
+    setLoading(false);
+  };
+
+  const temSecao = (codigo) => secoes.some(s => s.codigo === codigo);
+
+  const adicionarSecao = async (codigo) => {
+    setSalvandoSecao(codigo);
+    try {
+      const template = SECOES_TEMPLATE[codigo];
+      const r = await fetch(`${API_URL}/questionarios/${roteiro.id}/secoes`, {
+        method: 'POST', headers,
+        body: JSON.stringify(template),
+      });
+      if (!r.ok) { const e = await r.json(); showToast(e.error, 'error'); setSalvandoSecao(null); return; }
+      const novaSecao = await r.json();
+
+      // Para seção B, adiciona as perguntas padrão automaticamente
+      if (codigo === 'B' && PERGUNTAS_TEMPLATE.B) {
+        for (const p of PERGUNTAS_TEMPLATE.B) {
+          await fetch(`${API_URL}/secoes/${novaSecao.id}/perguntas`, {
+            method: 'POST', headers, body: JSON.stringify(p),
+          });
+        }
+      }
+
+      showToast(`Seção ${codigo} adicionada!`);
+      carregarSecoes();
+      setExpandida(codigo);
+    } catch { showToast('Erro ao adicionar seção', 'error'); }
+    setSalvandoSecao(codigo);
+    setSalvandoSecao(null);
+  };
+
+  const excluirSecao = async (secaoId, codigo) => {
+    if (!window.confirm(`Excluir a Seção ${codigo} e todas as suas perguntas?`)) return;
+    try {
+      await fetch(`${API_URL}/secoes/${secaoId}`, { method: 'DELETE', headers });
+      showToast(`Seção ${codigo} removida`);
+      carregarSecoes();
+      if (expandida === codigo) setExpandida(null);
+    } catch { showToast('Erro ao excluir', 'error'); }
+  };
+
+  const adicionarPergunta = async (secaoId, form) => {
+    try {
+      const r = await fetch(`${API_URL}/secoes/${secaoId}/perguntas`, {
+        method: 'POST', headers, body: JSON.stringify(form),
+      });
+      if (!r.ok) { const e = await r.json(); showToast(e.error, 'error'); return false; }
+      showToast('Pergunta adicionada!');
+      carregarSecoes();
+      return true;
+    } catch { showToast('Erro ao adicionar pergunta', 'error'); return false; }
+  };
+
+  const editarPergunta = async (perguntaId, form) => {
+    try {
+      const r = await fetch(`${API_URL}/perguntas/${perguntaId}`, {
+        method: 'PUT', headers, body: JSON.stringify(form),
+      });
+      if (!r.ok) { showToast('Erro ao salvar', 'error'); return false; }
+      showToast('Pergunta salva!');
+      carregarSecoes();
+      return true;
+    } catch { showToast('Erro ao salvar', 'error'); return false; }
+  };
+
+  const excluirPergunta = async (perguntaId) => {
+    if (!window.confirm('Excluir esta pergunta?')) return;
+    try {
+      await fetch(`${API_URL}/perguntas/${perguntaId}`, { method: 'DELETE', headers });
+      showToast('Pergunta excluída');
+      carregarSecoes();
+    } catch { showToast('Erro ao excluir', 'error'); }
+  };
+
+  const corSecao = (codigo) => codigo === 'A' ? 'blue' : 'orange';
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
+
+        {/* Toast */}
+        {toast && (
+          <div className={`absolute top-4 right-4 z-50 px-4 py-2 rounded-lg text-white text-sm font-medium shadow ${toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+            {toast.msg}
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b flex-shrink-0">
+          <div>
+            <h3 className="text-xl font-bold text-gray-800">Gerenciar Seções</h3>
+            <p className="text-sm text-gray-500 mt-0.5">{roteiro.titulo}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100">
+            <X size={22} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <span className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            ['A', 'B'].map((codigo) => {
+              const secao = secoes.find(s => s.codigo === codigo);
+              const cor = corSecao(codigo);
+              const corMap = { blue: { bg: 'bg-blue-600', light: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' }, orange: { bg: 'bg-orange-500', light: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' } };
+              const c = corMap[cor];
+
+              return (
+                <div key={codigo} className={`border-2 rounded-xl overflow-hidden ${secao ? c.border : 'border-gray-200 border-dashed'}`}>
+                  {/* Header da seção */}
+                  <div className={`flex items-center justify-between p-4 ${secao ? c.light : 'bg-gray-50'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white ${secao ? c.bg : 'bg-gray-300'}`}>
+                        {codigo}
+                      </div>
+                      <div>
+                        <p className={`font-semibold text-sm ${secao ? 'text-gray-800' : 'text-gray-400'}`}>
+                          {SECOES_TEMPLATE[codigo].titulo}
+                        </p>
+                        <p className="text-xs text-gray-400">{SECOES_TEMPLATE[codigo].descricao}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {secao ? (
+                        <>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.badge}`}>
+                            {secao.perguntas?.length || 0} pergunta(s)
+                          </span>
+                          {codigo !== 'A' && ( // Seção A não tem perguntas manuais
+                            <button
+                              onClick={() => setExpandida(expandida === codigo ? null : codigo)}
+                              className={`p-1.5 rounded-lg hover:bg-white transition-colors ${c.text}`}>
+                              {expandida === codigo ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => excluirSecao(secao.id, codigo)}
+                            className="p-1.5 text-red-400 hover:bg-red-50 rounded-lg transition-colors">
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => adicionarSecao(codigo)}
+                          disabled={salvandoSecao === codigo}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50">
+                          {salvandoSecao === codigo ? (
+                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : <Plus size={15} />}
+                          Adicionar Seção {codigo}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Seção A: info de que é preenchida automaticamente */}
+                  {secao && codigo === 'A' && (
+                    <div className="px-4 py-3 bg-white border-t border-blue-100">
+                      <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg">
+                        <Info size={16} className="text-blue-500 mt-0.5 flex-shrink-0" />
+                        <div className="text-sm text-blue-700">
+                          <p className="font-semibold">Campos preenchidos automaticamente no app:</p>
+                          <p className="mt-1 text-blue-600">Razão Social, Nome Fantasia e CNPJ vêm do cadastro do estabelecimento. O fiscal preenche: Objetivo da Inspeção, Data e Acompanhante da Vistoria.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Seção B: lista de perguntas expansível */}
+                  {secao && codigo === 'B' && expandida === 'B' && (
+                    <div className="bg-white border-t border-orange-100">
+                      <div className="p-4 space-y-2">
+                        {(secao.perguntas || []).map((p, idx) => (
+                          <div key={p.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 group">
+                            <span className="w-6 h-6 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800">{p.texto}</p>
+                              {p.referencia_legal && (
+                                <p className="text-xs text-gray-400 mt-0.5 italic">{p.referencia_legal}</p>
+                              )}
+                              <div className="flex gap-2 mt-1.5">
+                                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                                  {TIPO_RESPOSTA_LABELS[p.tipo_resposta] || p.tipo_resposta}
+                                </span>
+                                {p.obrigatoria && (
+                                  <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full">Obrigatória</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => setModalPergunta({ secaoId: secao.id, item: p })}
+                                className="p-1 text-blue-500 hover:bg-blue-50 rounded">
+                                <Edit2 size={14} />
+                              </button>
+                              <button onClick={() => excluirPergunta(p.id)}
+                                className="p-1 text-red-400 hover:bg-red-50 rounded">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Botão nova pergunta */}
+                        <button
+                          onClick={() => setModalPergunta({ secaoId: secao.id, item: null })}
+                          className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-orange-200 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors text-sm font-medium">
+                          <Plus size={16} /> Nova Pergunta
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="p-4 border-t bg-gray-50 rounded-b-xl flex-shrink-0">
+          <button onClick={onClose}
+            className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-medium">
+            Fechar
+          </button>
+        </div>
+      </div>
+
+      {/* Modal pergunta */}
+      {modalPergunta && (
+        <ModalPergunta
+          item={modalPergunta.item}
+          onSave={async (form) => {
+            let ok;
+            if (modalPergunta.item) {
+              ok = await editarPergunta(modalPergunta.item.id, { ...form, ordem: modalPergunta.item.ordem });
+            } else {
+              ok = await adicionarPergunta(modalPergunta.secaoId, form);
+            }
+            if (ok) setModalPergunta(null);
+          }}
+          onClose={() => setModalPergunta(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ==================== MODAL PERGUNTA ====================
+
+function ModalPergunta({ item, onSave, onClose }) {
+  const [form, setForm] = useState({
+    texto: item?.texto || '',
+    tipo_resposta: item?.tipo_resposta || 'SIM_NAO',
+    obrigatoria: item?.obrigatoria ?? true,
+    referencia_legal: item?.referencia_legal || '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
+
+  const handleSubmit = async () => {
+    if (!form.texto.trim()) return alert('Digite o texto da pergunta');
+    setSaving(true);
+    await onSave(form);
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-[60]">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+        <div className="flex justify-between items-center p-5 border-b">
+          <h3 className="text-lg font-bold">{item ? 'Editar Pergunta' : 'Nova Pergunta'}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Texto da Pergunta *</label>
+            <textarea
+              value={form.texto}
+              onChange={e => set('texto', e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+              placeholder="Ex: Existe responsável técnico inscrito no CRF?"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Resposta</label>
+              <select value={form.tipo_resposta} onChange={e => set('tipo_resposta', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                {Object.entries(TIPO_RESPOSTA_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col justify-end">
+              <label className="flex items-center gap-2 cursor-pointer p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <input type="checkbox" checked={form.obrigatoria} onChange={e => set('obrigatoria', e.target.checked)}
+                  className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-gray-700">Obrigatória</span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Referência Legal</label>
+            <input value={form.referencia_legal} onChange={e => set('referencia_legal', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Ex: Art.15 da lei Federal 5991/73" />
+          </div>
+        </div>
+        <div className="flex gap-3 p-5 border-t bg-gray-50 rounded-b-xl">
+          <button onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 font-medium">
+            Cancelar
+          </button>
+          <button onClick={handleSubmit} disabled={saving}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+            {saving ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Check size={16} />}
+            {item ? 'Salvar' : 'Adicionar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ==================== APP PRINCIPAL ====================
 
 function App() {
@@ -378,7 +773,8 @@ function App() {
   const [modal, setModal] = useState(null); // null | 'novo' | 'editar' | 'excluir'
   const [selectedItem, setSelectedItem] = useState(null);
   const [viewingInspecao, setViewingInspecao] = useState(null);
-  const [modalRoteiro, setModalRoteiro] = useState(null); // null | 'form'
+  const [modalRoteiro, setModalRoteiro] = useState(null);
+  const [gerenciandoSecoes, setGerenciandoSecoes] = useState(null); // roteiro selecionado // null | 'form'
   const [selectedRoteiro, setSelectedRoteiro] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -745,6 +1141,11 @@ function App() {
                         <Edit2 size={16} />
                       </button>
                       <button
+                        onClick={() => setGerenciandoSecoes(r)}
+                        className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Gerenciar Seções">
+                        <FileText size={16} />
+                      </button>
+                      <button
                         onClick={() => excluirRoteiro(r.id)}
                         className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Desativar">
                         <Trash2 size={16} />
@@ -818,6 +1219,14 @@ function App() {
       </main>
 
       {/* ===== MODALS ===== */}
+      {gerenciandoSecoes && (
+        <GerenciarSecoes
+          roteiro={gerenciandoSecoes}
+          token={token}
+          onClose={() => setGerenciandoSecoes(null)}
+        />
+      )}
+
       {modalRoteiro === 'form' && (
         <ModalRoteiro
           item={selectedRoteiro}

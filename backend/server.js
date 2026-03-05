@@ -425,6 +425,132 @@ app.get('/api/inspecoes', authenticateToken, async (req, res) => {
   }
 });
 
+
+// ==================== SEÇÕES ====================
+
+app.get('/api/questionarios/:id/secoes', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const secoes = await pool.query('SELECT * FROM secoes WHERE questionario_id = $1 ORDER BY ordem', [id]);
+    const secoesCompletas = await Promise.all(
+      secoes.rows.map(async (secao) => {
+        const perguntas = await pool.query('SELECT * FROM perguntas WHERE secao_id = $1 ORDER BY ordem', [secao.id]);
+        return { ...secao, perguntas: perguntas.rows };
+      })
+    );
+    res.json(secoesCompletas);
+  } catch (error) {
+    console.error('Erro ao listar seções:', error);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.post('/api/questionarios/:id/secoes', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { codigo, titulo, descricao, tipo_secao, bloqueante, exige_farmaceutico } = req.body;
+    if (!codigo || !titulo || !tipo_secao) {
+      return res.status(400).json({ error: 'Código, título e tipo são obrigatórios' });
+    }
+    // Calcula próxima ordem
+    const ordemResult = await pool.query(
+      'SELECT COALESCE(MAX(ordem), 0) + 1 as proxima FROM secoes WHERE questionario_id = $1', [id]
+    );
+    const ordem = ordemResult.rows[0].proxima;
+    const result = await pool.query(
+      `INSERT INTO secoes (questionario_id, codigo, titulo, descricao, ordem, tipo_secao, bloqueante, exige_farmaceutico)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [id, codigo.toUpperCase(), titulo, descricao, ordem, tipo_secao, bloqueante || false, exige_farmaceutico || false]
+    );
+    res.status(201).json({ ...result.rows[0], perguntas: [] });
+  } catch (error) {
+    console.error('Erro ao criar seção:', error);
+    if (error.code === '23505') return res.status(400).json({ error: 'Já existe uma seção com este código neste roteiro' });
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.put('/api/secoes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { titulo, descricao, tipo_secao, bloqueante, exige_farmaceutico } = req.body;
+    const result = await pool.query(
+      `UPDATE secoes SET titulo=$1, descricao=$2, tipo_secao=$3, bloqueante=$4, exige_farmaceutico=$5
+       WHERE id=$6 RETURNING *`,
+      [titulo, descricao, tipo_secao, bloqueante, exige_farmaceutico, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Seção não encontrada' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao atualizar seção:', error);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.delete('/api/secoes/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM secoes WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao excluir seção:', error);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+// ==================== PERGUNTAS ====================
+
+app.post('/api/secoes/:id/perguntas', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { texto, tipo_resposta, obrigatoria, referencia_legal } = req.body;
+    if (!texto || !tipo_resposta) {
+      return res.status(400).json({ error: 'Texto e tipo de resposta são obrigatórios' });
+    }
+    const ordemResult = await pool.query(
+      'SELECT COALESCE(MAX(ordem), 0) + 1 as proxima FROM perguntas WHERE secao_id = $1', [id]
+    );
+    const ordem = ordemResult.rows[0].proxima;
+    const result = await pool.query(
+      `INSERT INTO perguntas (secao_id, texto, ordem, obrigatoria, tipo_resposta, referencia_legal)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [id, texto, ordem, obrigatoria || false, tipo_resposta, referencia_legal]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao criar pergunta:', error);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.put('/api/perguntas/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { texto, tipo_resposta, obrigatoria, referencia_legal, ordem } = req.body;
+    const result = await pool.query(
+      `UPDATE perguntas SET texto=$1, tipo_resposta=$2, obrigatoria=$3, referencia_legal=$4, ordem=$5
+       WHERE id=$6 RETURNING *`,
+      [texto, tipo_resposta, obrigatoria, referencia_legal, ordem, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Pergunta não encontrada' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao atualizar pergunta:', error);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.delete('/api/perguntas/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM perguntas WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao excluir pergunta:', error);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
 // ==================== HEALTH CHECK ====================
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date(), version: 'v1' });
