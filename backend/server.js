@@ -113,6 +113,55 @@ app.get('/api/estabelecimentos/:id', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/estabelecimentos', authenticateToken, async (req, res) => {
+  try {
+    const { razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo } = req.body;
+    if (!razao_social || !cnpj) return res.status(400).json({ error: 'Razão social e CNPJ são obrigatórios' });
+    const result = await pool.query(
+      `INSERT INTO estabelecimentos (razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo ?? true]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao criar estabelecimento:', error);
+    if (error.code === '23505') return res.status(400).json({ error: 'CNPJ já cadastrado' });
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.put('/api/estabelecimentos/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo } = req.body;
+    if (!razao_social || !cnpj) return res.status(400).json({ error: 'Razão social e CNPJ são obrigatórios' });
+    const result = await pool.query(
+      `UPDATE estabelecimentos SET razao_social=$1, nome_fantasia=$2, cnpj=$3, endereco=$4, telefone=$5, email=$6, ativo=$7
+       WHERE id=$8 RETURNING *`,
+      [razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Estabelecimento não encontrado' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao atualizar estabelecimento:', error);
+    if (error.code === '23505') return res.status(400).json({ error: 'CNPJ já cadastrado' });
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.delete('/api/estabelecimentos/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('DELETE FROM estabelecimentos WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Estabelecimento não encontrado' });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao excluir estabelecimento:', error);
+    if (error.code === '23503') return res.status(400).json({ error: 'Não é possível excluir: estabelecimento possui inspeções vinculadas' });
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
 // ==================== QUESTIONÁRIOS ====================
 
 app.get('/api/questionarios', authenticateToken, async (req, res) => {
