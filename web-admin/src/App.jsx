@@ -216,6 +216,153 @@ function ModalConfirmar({ nome, onConfirm, onClose }) {
   );
 }
 
+
+// ==================== MODAL ROTEIRO ====================
+
+function ModalRoteiro({ item, estabelecimentos, onSave, onClose }) {
+  const [form, setForm] = useState({
+    titulo: item?.titulo || '',
+    descricao: item?.descricao || '',
+    versao: item?.versao || '05',
+    tipo: item?.tipo || 'INSPECAO_FARMACIA',
+    estabelecimento_id: item?.estabelecimento_id || '',
+  });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const set = (field, value) => {
+    setForm(f => ({ ...f, [field]: value }));
+    setErrors(e => ({ ...e, [field]: null }));
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!form.titulo.trim()) e.titulo = 'Obrigatório';
+    if (!form.estabelecimento_id) e.estabelecimento_id = 'Selecione um estabelecimento';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) return;
+    setSaving(true);
+    await onSave({ ...form, estabelecimento_id: parseInt(form.estabelecimento_id) });
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+        <div className="flex justify-between items-center p-6 border-b">
+          <div>
+            <h3 className="text-xl font-bold text-gray-800">{item ? 'Editar Roteiro' : 'Novo Roteiro'}</h3>
+            <p className="text-sm text-gray-500 mt-1">Preencha os dados do roteiro de inspeção</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100">
+            <X size={22} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Estabelecimento */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Estabelecimento <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.estabelecimento_id}
+              onChange={e => set('estabelecimento_id', e.target.value)}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white ${errors.estabelecimento_id ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+            >
+              <option value="">Selecione um estabelecimento...</option>
+              {estabelecimentos.map(e => (
+                <option key={e.id} value={e.id}>
+                  {e.nome_fantasia || e.razao_social} — {e.cnpj}
+                </option>
+              ))}
+            </select>
+            {errors.estabelecimento_id && <p className="text-red-500 text-xs mt-1">{errors.estabelecimento_id}</p>}
+            {form.estabelecimento_id && (() => {
+              const est = estabelecimentos.find(e => e.id === parseInt(form.estabelecimento_id));
+              return est ? (
+                <div className="mt-2 p-2 bg-blue-50 rounded-lg text-xs text-blue-700">
+                  <span className="font-semibold">{est.razao_social}</span>
+                  {est.cnpj && <span className="ml-2 text-blue-500">CNPJ: {est.cnpj}</span>}
+                </div>
+              ) : null;
+            })()}
+          </div>
+
+          {/* Título */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Título do Roteiro <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={form.titulo}
+              onChange={e => set('titulo', e.target.value)}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none ${errors.titulo ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+              placeholder="Ex: Roteiro de Inspeção - Drogaria"
+            />
+            {errors.titulo && <p className="text-red-500 text-xs mt-1">{errors.titulo}</p>}
+          </div>
+
+          {/* Descrição */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+            <textarea
+              value={form.descricao}
+              onChange={e => set('descricao', e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+              placeholder="Descrição opcional do roteiro..."
+            />
+          </div>
+
+          {/* Versão + Tipo lado a lado */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Versão</label>
+              <input
+                value={form.versao}
+                onChange={e => set('versao', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Ex: 05"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+              <select
+                value={form.tipo}
+                onChange={e => set('tipo', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              >
+                <option value="INSPECAO_FARMACIA">Inspeção Farmácia</option>
+                <option value="INSPECAO_DROGARIA">Inspeção Drogaria</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 p-6 border-t bg-gray-50 rounded-b-xl">
+          <button onClick={onClose}
+            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium">
+            Cancelar
+          </button>
+          <button onClick={handleSubmit} disabled={saving}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2">
+            {saving ? (
+              <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Salvando...</>
+            ) : (
+              <><Check size={16} /> {item ? 'Salvar' : 'Criar Roteiro'}</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ==================== APP PRINCIPAL ====================
 
 function App() {
@@ -231,6 +378,8 @@ function App() {
   const [modal, setModal] = useState(null); // null | 'novo' | 'editar' | 'excluir'
   const [selectedItem, setSelectedItem] = useState(null);
   const [viewingInspecao, setViewingInspecao] = useState(null);
+  const [modalRoteiro, setModalRoteiro] = useState(null); // null | 'form'
+  const [selectedRoteiro, setSelectedRoteiro] = useState(null);
   const [toast, setToast] = useState(null);
 
   const [loginEmail, setLoginEmail] = useState('');
@@ -344,6 +493,35 @@ function App() {
     } catch {
       showToast('Erro de conexão', 'error');
     }
+  };
+
+  const salvarRoteiro = async (form) => {
+    try {
+      const isEdit = !!selectedRoteiro;
+      const url = isEdit ? `${API_URL}/questionarios/${selectedRoteiro.id}` : `${API_URL}/questionarios`;
+      const r = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(form)
+      });
+      if (r.ok) {
+        showToast(isEdit ? 'Roteiro atualizado!' : 'Roteiro criado!');
+        setModalRoteiro(null); setSelectedRoteiro(null);
+        loadData();
+      } else {
+        const err = await r.json();
+        showToast(err.error || 'Erro ao salvar', 'error');
+      }
+    } catch { showToast('Erro de conexão', 'error'); }
+  };
+
+  const excluirRoteiro = async (id) => {
+    if (!window.confirm('Desativar este roteiro?')) return;
+    try {
+      const r = await fetch(`${API_URL}/questionarios/${id}`, { method: 'DELETE', headers: authHeaders() });
+      if (r.ok) { showToast('Roteiro desativado!'); loadData(); }
+      else showToast('Erro ao desativar', 'error');
+    } catch { showToast('Erro de conexão', 'error'); }
   };
 
   const verInspecao = async (id) => {
@@ -523,20 +701,54 @@ function App() {
         {activeTab === 'roteiros' && (
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Roteiros de Inspeção</h2>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Roteiros de Inspeção</h2>
+                <p className="text-sm text-gray-500 mt-1">{roteiros.length} roteiro(s) cadastrado(s)</p>
+              </div>
+              <button
+                onClick={() => { setSelectedRoteiro(null); setModalRoteiro('form'); }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm">
+                <Plus size={18} /> Novo Roteiro
+              </button>
             </div>
             <div className="grid gap-4">
               {roteiros.map((r) => (
-                <div key={r.id} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                <div key={r.id} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200 hover:border-blue-200 transition-colors">
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-800">{r.titulo}</h3>
                       {r.descricao && <p className="text-sm text-gray-500 mt-1">{r.descricao}</p>}
-                      <div className="flex gap-3 mt-2">
+
+                      {/* Estabelecimento vinculado */}
+                      {r.estabelecimento_nome && (
+                        <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded-lg w-fit">
+                          <Building2 size={14} className="text-blue-500" />
+                          <span className="text-xs text-blue-700 font-medium">
+                            {r.estabelecimento_fantasia || r.estabelecimento_nome}
+                          </span>
+                          {r.estabelecimento_cnpj && (
+                            <span className="text-xs text-blue-400">— {r.estabelecimento_cnpj}</span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 mt-3 flex-wrap">
                         {r.versao && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">v{r.versao}</span>}
                         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{r.total_secoes || 0} seções</span>
-                        {r.tipo && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded-full">{r.tipo}</span>}
+                        {r.tipo && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded-full">{r.tipo.replace(/_/g, ' ')}</span>}
                       </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <button
+                        onClick={() => { setSelectedRoteiro(r); setModalRoteiro('form'); }}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => excluirRoteiro(r.id)}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Desativar">
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -544,7 +756,8 @@ function App() {
               {roteiros.length === 0 && (
                 <div className="bg-white rounded-xl p-16 text-center border border-gray-200">
                   <FileText size={40} className="text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-400">Nenhum roteiro cadastrado</p>
+                  <p className="text-gray-400 font-medium">Nenhum roteiro cadastrado</p>
+                  <p className="text-gray-300 text-sm mt-1">Clique em "Novo Roteiro" para começar</p>
                 </div>
               )}
             </div>
@@ -605,6 +818,14 @@ function App() {
       </main>
 
       {/* ===== MODALS ===== */}
+      {modalRoteiro === 'form' && (
+        <ModalRoteiro
+          item={selectedRoteiro}
+          estabelecimentos={estabelecimentos}
+          onSave={salvarRoteiro}
+          onClose={() => { setModalRoteiro(null); setSelectedRoteiro(null); }}
+        />
+      )}
       {modal === 'form' && (
         <ModalEstabelecimento
           item={selectedItem}

@@ -167,8 +167,14 @@ app.delete('/api/estabelecimentos/:id', authenticateToken, async (req, res) => {
 app.get('/api/questionarios', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT q.*, (SELECT COUNT(*) FROM secoes WHERE questionario_id = q.id) as total_secoes
-      FROM questionarios q WHERE q.ativo = true ORDER BY q.criado_em DESC
+      SELECT q.*,
+        (SELECT COUNT(*) FROM secoes WHERE questionario_id = q.id) as total_secoes,
+        e.razao_social as estabelecimento_nome,
+        e.nome_fantasia as estabelecimento_fantasia,
+        e.cnpj as estabelecimento_cnpj
+      FROM questionarios q
+      LEFT JOIN estabelecimentos e ON q.estabelecimento_id = e.id
+      WHERE q.ativo = true ORDER BY q.criado_em DESC
     `);
     res.json(result.rows);
   } catch (error) {
@@ -177,10 +183,59 @@ app.get('/api/questionarios', authenticateToken, async (req, res) => {
   }
 });
 
+app.post('/api/questionarios', authenticateToken, async (req, res) => {
+  try {
+    const { titulo, descricao, tipo, versao, estabelecimento_id } = req.body;
+    if (!titulo) return res.status(400).json({ error: 'Título é obrigatório' });
+    const result = await pool.query(
+      `INSERT INTO questionarios (titulo, descricao, tipo, versao, estabelecimento_id, ativo)
+       VALUES ($1, $2, $3, $4, $5, true) RETURNING *`,
+      [titulo, descricao, tipo || 'INSPECAO_FARMACIA', versao || '05', estabelecimento_id || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao criar questionário:', error);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.put('/api/questionarios/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { titulo, descricao, tipo, versao, estabelecimento_id, ativo } = req.body;
+    const result = await pool.query(
+      `UPDATE questionarios SET titulo=$1, descricao=$2, tipo=$3, versao=$4, estabelecimento_id=$5, ativo=$6
+       WHERE id=$7 RETURNING *`,
+      [titulo, descricao, tipo, versao, estabelecimento_id || null, ativo ?? true, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Questionário não encontrado' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Erro ao atualizar questionário:', error);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+app.delete('/api/questionarios/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('UPDATE questionarios SET ativo=false WHERE id=$1', [id]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao excluir questionário:', error);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
 app.get('/api/questionarios/:id/completo', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const questionario = await pool.query('SELECT * FROM questionarios WHERE id = $1', [id]);
+    const questionario = await pool.query(`
+      SELECT q.*, e.razao_social, e.nome_fantasia, e.cnpj, e.endereco, e.telefone, e.email
+      FROM questionarios q
+      LEFT JOIN estabelecimentos e ON q.estabelecimento_id = e.id
+      WHERE q.id = $1
+    `, [id]);
     if (questionario.rows.length === 0) return res.status(404).json({ error: 'Questionário não encontrado' });
     const secoes = await pool.query('SELECT * FROM secoes WHERE questionario_id = $1 ORDER BY ordem', [id]);
     const secoesCompletas = await Promise.all(

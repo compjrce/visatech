@@ -48,34 +48,15 @@ class _InspecaoScreenState extends State<InspecaoScreen> {
       _secoes.isEmpty ? 0 : (_secaoAtual + 1) / _secoes.length;
 
   // Seção A: cria a inspeção no backend com os dados de identificação
-  Future<void> _avancarSecaoA(List<Resposta> respostas) async {
+  Future<void> _avancarSecaoA(List<Resposta> respostas, Map<String, dynamic> dadosSecaoA) async {
     _mostrarLoading('Iniciando inspeção...');
     try {
       final api = context.read<AuthService>().apiService;
 
-      // Monta dados_secao_a a partir das respostas de texto
-      final dadosSecaoA = <String, dynamic>{};
-      final secao = _secoes[_secaoAtual];
-      for (final r in respostas) {
-        final pergunta = secao.perguntas?.firstWhere(
-          (p) => p.id == r.perguntaId,
-          orElse: () => secao.perguntas!.first,
-        );
-        if (pergunta != null && r.respostaTexto != null) {
-          final chave = pergunta.texto
-              .toLowerCase()
-              .replaceAll(RegExp(r'[^a-z0-9]'), '_')
-              .substring(0, pergunta.texto.length.clamp(0, 30));
-          dadosSecaoA[chave] = r.respostaTexto;
-        }
-      }
-
-      // Usa o primeiro estabelecimento disponível ou null
-      // (idealmente viria de uma seleção prévia)
       final result = await api.criarInspecao(
         questionarioId: widget.questionario.id,
-        estabelecimentoId: 1, // TODO: receber estabelecimento selecionado
-        tipoInspecao: 'Rotina',
+        estabelecimentoId: widget.questionario.estabelecimentoId ?? 1,
+        tipoInspecao: dadosSecaoA['objetivo_inspecao'] ?? 'Rotina',
         dadosSecaoA: dadosSecaoA,
       );
 
@@ -299,6 +280,7 @@ class _InspecaoScreenState extends State<InspecaoScreen> {
     if (secao.codigo == 'A' || secao.isIdentificacao) {
       return SecaoAScreen(
         secao: secao,
+        questionario: _questionarioCompleto!,
         onAvancar: _avancarSecaoA,
       );
     }
