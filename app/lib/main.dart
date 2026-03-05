@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/auth_service.dart';
@@ -26,6 +27,19 @@ class MyApp extends StatelessWidget {
           title: 'VISATech',
           debugShowCheckedModeBanner: false,
           theme: themeProvider.currentTheme,
+
+          // ✅ Necessário para DatePickerDialog em português
+          localizationsDelegates: [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: [
+            Locale('pt', 'BR'),
+            Locale('en', 'US'),
+          ],
+          locale: Locale('pt', 'BR'),
+
           home: SplashScreen(),
         );
       },
@@ -46,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuth() async {
-    await Future.delayed(Duration(seconds: 1)); // Splash mínimo
+    await Future.delayed(Duration(seconds: 1));
 
     final authService = context.read<AuthService>();
     final isAuthenticated = await authService.checkAuth();

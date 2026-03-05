@@ -364,6 +364,133 @@ function ModalRoteiro({ item, estabelecimentos, onSave, onClose }) {
 }
 
 
+
+// ==================== SEÇÃO C VIEWER (abas I–V) ====================
+
+const ABAS_C = [
+  { id: 'I',   label: 'I – Informações Gerais',         prefixo: 'I – Informações Gerais' },
+  { id: 'II',  label: 'II – Documentos',                prefixo: 'II – Documentos Apresentados' },
+  { id: 'III', label: 'III – MBP',                      prefixo: 'III – MBP' },
+  { id: 'IV',  label: 'IV – POPs',                      prefixo: 'IV – POPs' },
+  { id: 'V',   label: 'V – Registros',                  prefixo: 'V – Verificação dos Registros' },
+];
+
+function SecaoCViewer({ secao, onEditPergunta, onDeletePergunta, onNovaPergunta }) {
+  const [abaAtiva, setAbaAtiva] = useState('I');
+
+  const perguntasDaAba = (abaId) => {
+    const aba = ABAS_C.find(a => a.id === abaId);
+    if (!aba) return [];
+    const perguntas = secao.perguntas || [];
+
+    if (abaId === 'IV') {
+      // POPs: referencia_legal começa com 'IV' ou 'Art' (os POPs específicos)
+      return perguntas.filter(p =>
+        p.referencia_legal?.startsWith('IV') ||
+        p.referencia_legal?.startsWith('Art') ||
+        p.referencia_legal?.startsWith('Inciso') ||
+        p.referencia_legal?.startsWith('§')
+      );
+    }
+    return perguntas.filter(p => p.referencia_legal?.startsWith(aba.prefixo));
+  };
+
+  const iconeTipo = (tipo) => {
+    switch(tipo) {
+      case 'SIM_NAO': return '✓/✗';
+      case 'SIM_NAO_NA_NO': return 'S/N/NA';
+      case 'TEXTO': return 'Aa';
+      case 'DATA': return '📅';
+      case 'NUMERO': return '#';
+      case 'CHECKBOXES': return '☑';
+      case 'TABELA_TREINAMENTOS': return '⊞';
+      default: return '?';
+    }
+  };
+
+  const corTipo = (tipo) => {
+    switch(tipo) {
+      case 'SIM_NAO': return 'bg-green-50 text-green-700';
+      case 'TEXTO': return 'bg-blue-50 text-blue-700';
+      case 'DATA': return 'bg-yellow-50 text-yellow-700';
+      case 'NUMERO': return 'bg-orange-50 text-orange-700';
+      case 'CHECKBOXES': return 'bg-indigo-50 text-indigo-700';
+      case 'TABELA_TREINAMENTOS': return 'bg-purple-50 text-purple-700';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const perguntas = perguntasDaAba(abaAtiva);
+
+  return (
+    <div className="bg-white border-t border-purple-100">
+      {/* Abas */}
+      <div className="flex overflow-x-auto border-b border-purple-100 bg-purple-50">
+        {ABAS_C.map(aba => {
+          const count = perguntasDaAba(aba.id).length;
+          return (
+            <button
+              key={aba.id}
+              onClick={() => setAbaAtiva(aba.id)}
+              className={`flex-shrink-0 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                abaAtiva === aba.id
+                  ? 'border-purple-600 text-purple-700 bg-white'
+                  : 'border-transparent text-gray-500 hover:text-purple-600'
+              }`}
+            >
+              {aba.label}
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${abaAtiva === aba.id ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-500'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Conteúdo da aba */}
+      <div className="p-4 space-y-2">
+        {perguntas.length === 0 ? (
+          <div className="text-center py-6 text-gray-400">
+            <p className="text-sm">Nenhuma pergunta nesta subseção</p>
+          </div>
+        ) : (
+          perguntas.map((p, idx) => (
+            <div key={p.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 group hover:border-purple-200 transition-colors">
+              <span className="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                {idx + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 leading-snug">{p.texto}</p>
+                {p.referencia_legal && !p.referencia_legal.startsWith('I') && !p.referencia_legal.startsWith('V') && (
+                  <p className="text-xs text-gray-400 mt-0.5 italic">{p.referencia_legal}</p>
+                )}
+                <span className={`inline-block mt-1.5 text-xs px-2 py-0.5 rounded-full font-medium ${corTipo(p.tipo_resposta)}`}>
+                  {iconeTipo(p.tipo_resposta)} {TIPO_RESPOSTA_LABELS[p.tipo_resposta] || p.tipo_resposta}
+                </span>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <button onClick={() => onEditPergunta(p)} className="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Editar">
+                  <Edit2 size={13} />
+                </button>
+                <button onClick={() => onDeletePergunta(p.id)} className="p-1 text-red-400 hover:bg-red-50 rounded" title="Excluir">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* Nova pergunta */}
+        <button
+          onClick={onNovaPergunta}
+          className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-purple-200 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors text-sm font-medium mt-1">
+          <Plus size={15} /> Nova Pergunta nesta Seção
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ==================== CONFIGURAÇÃO SEÇÕES A e B ====================
 
 const SECOES_TEMPLATE = {
@@ -383,6 +510,14 @@ const SECOES_TEMPLATE = {
     exige_farmaceutico: true,
     descricao: 'Validação da presença do farmacêutico responsável técnico',
   },
+  C: {
+    codigo: 'C',
+    titulo: 'ADMINISTRAÇÃO',
+    tipo_secao: 'MISTA',
+    bloqueante: false,
+    exige_farmaceutico: false,
+    descricao: 'Informações gerais, documentos, MBP, POPs e registros',
+  },
 };
 
 const PERGUNTAS_TEMPLATE = {
@@ -390,6 +525,62 @@ const PERGUNTAS_TEMPLATE = {
     { texto: 'Existe responsável técnico no estabelecimento inscrito no CRF?', tipo_resposta: 'SIM_NAO', obrigatoria: true, referencia_legal: 'Art.15 da lei Federal 5991/73 c/c Art.3º da Resolução RDC 44/2009' },
     { texto: 'Farmacêutico presente desde o início da inspeção?', tipo_resposta: 'SIM_NAO', obrigatoria: true, referencia_legal: 'Art.15 § 1º e 2º da Lei Federal 5991/73 c/c Art.3º da Resolução RDC 44/2009' },
     { texto: 'O farmacêutico está identificado de modo distinto dos demais funcionários?', tipo_resposta: 'SIM_NAO', obrigatoria: true, referencia_legal: 'Art.17, parágrafo único da Resolução RDC 44/2009' },
+  ],
+  C: [
+    // I – INFORMAÇÕES GERAIS
+    { texto: 'Horário de funcionamento', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'I – Informações Gerais' },
+    { texto: 'Número de funcionários', tipo_resposta: 'NUMERO', obrigatoria: false, referencia_legal: 'I – Informações Gerais' },
+    { texto: 'Áreas físicas (Vendas / Estoque / Serviços Farmacêuticos / Copa / Gerência / Vestiário / Banheiros / Outros)', tipo_resposta: 'CHECKBOXES', obrigatoria: false, referencia_legal: 'I – Informações Gerais' },
+    // II – DOCUMENTOS
+    { texto: 'AFE – Número', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'AFE – Atividades (Comércio / Dispensar Medicamento / Publicação / Portaria 344 / Prestação de Serviços)', tipo_resposta: 'CHECKBOXES', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'Certidão de Regularidade do CRF – nº', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'Certidão de Regularidade do CRF – Validade', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'AVCB ou CLCB – nº', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'AVCB ou CLCB – Validade', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'ASO dos funcionários', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'PCMSO e PGR', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'Certificado de controle integrado de pragas – realizado em', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'Certificado de controle integrado de pragas – válido até', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'Certificado de controle de limpeza de caixa d'água – realizado em', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'Certificado de controle de limpeza de caixa d'água – válido até', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'PGRSS – Atualizado em', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'PGRSS – Tipos de resíduos', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'PGRSS – Comprovantes de recolha RSS', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'PMOC – Elaborado por', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'II – Documentos Apresentados' },
+    { texto: 'PMOC – Certificados de manutenção em acordo com o plano', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Lei Federal 13.589/2018 c/c Portaria 3.523/1998 c/c RE 09/2003' },
+    // III – MBP
+    { texto: 'Manual de Boas Práticas revisado em', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'III – MBP' },
+    // IV – POPs
+    { texto: 'Procedimento Operacional Padrão atualizado em', tipo_resposta: 'DATA', obrigatoria: false, referencia_legal: 'IV – POPs' },
+    { texto: 'Lista mestre de POPs', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'IV – POPs' },
+    { texto: 'POPs para todos os serviços farmacêuticos', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'IV – POPs' },
+    { texto: 'POP – Limpeza da caixa d'água (quando aplicável)', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art. 12' },
+    { texto: 'POP – Limpeza do espaço para prestação de serviços farmacêuticos', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art. 16' },
+    { texto: 'POP – Aquisição de produtos', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Inciso II do Art. 86' },
+    { texto: 'POP – Recebimento de produtos', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art. 32 e Inciso II do Art. 86' },
+    { texto: 'POP – Condições de armazenamento', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: '§4º do Art. 35 e Inciso II do Art. 86' },
+    { texto: 'POP – Exposição e organização dos produtos para comercialização', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Inciso III do Art. 86' },
+    { texto: 'POP – Produtos com prazo de validade próximo ao vencimento', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art. 51 e Inciso VI do Art. 86' },
+    { texto: 'POP – Destino dos produtos com prazos de validade vencidos', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Inciso V do Art. 86' },
+    { texto: 'POP – Comércio por meio remoto', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: '§3º do Art. 56' },
+    { texto: 'POP – Atenção farmacêutica', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art. 65 parágrafo único' },
+    { texto: 'POP – Aferição de pressão arterial (se aplicável)', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art. 72' },
+    { texto: 'POP – Aferição de temperatura corporal (se aplicável)', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art. 72' },
+    { texto: 'POP – Perfuração de lóbulo auricular', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art. 80' },
+    { texto: 'POP – Manutenção das condições higiênicas e sanitárias de cada ambiente', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art. 83 e Inciso I do Art. 86' },
+    { texto: 'POP – Dispensação de medicamentos', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Inciso IV do Art. 86' },
+    // V – REGISTROS
+    { texto: 'Temperatura da geladeira', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
+    { texto: 'Temperatura ambiente', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
+    { texto: 'Umidade relativa do ar', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
+    { texto: 'Registros de capacitação periódica dos funcionários', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'Art.24 a 28 da Resolução RDC 44/2009' },
+    { texto: 'Capacitação – Cumprimento da legislação sanitária vigente', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
+    { texto: 'Capacitação – Procedimentos Operacionais Padrão (POPs)', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
+    { texto: 'Capacitação – Autocuidado, higiene pessoal e de ambiente, saúde', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
+    { texto: 'Capacitação – Uso e descarte dos EPIs de acordo com PGRSS', tipo_resposta: 'SIM_NAO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
+    { texto: 'Capacitação – Outro', tipo_resposta: 'TEXTO', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
+    { texto: 'Tabela de treinamentos (Data / Carga Horária / Ministrante / Assinatura dos capacitados)', tipo_resposta: 'TABELA_TREINAMENTOS', obrigatoria: false, referencia_legal: 'V – Verificação dos Registros' },
   ],
 };
 
@@ -501,7 +692,7 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
     } catch { showToast('Erro ao excluir', 'error'); }
   };
 
-  const corSecao = (codigo) => codigo === 'A' ? 'blue' : 'orange';
+  const corSecao = (codigo) => codigo === 'A' ? 'blue' : codigo === 'B' ? 'orange' : 'purple';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
@@ -531,10 +722,10 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
               <span className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            ['A', 'B'].map((codigo) => {
+            ['A', 'B', 'C'].map((codigo) => {
               const secao = secoes.find(s => s.codigo === codigo);
               const cor = corSecao(codigo);
-              const corMap = { blue: { bg: 'bg-blue-600', light: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' }, orange: { bg: 'bg-orange-500', light: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' } };
+              const corMap = { blue: { bg: 'bg-blue-600', light: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' }, orange: { bg: 'bg-orange-500', light: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-700' }, purple: { bg: 'bg-purple-600', light: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-700' } };
               const c = corMap[cor];
 
               return (
@@ -645,6 +836,16 @@ function GerenciarSecoes({ roteiro, token, onClose }) {
                     </div>
                   )}
                 </div>
+
+                  {/* Seção C: abas I–V */}
+                  {secao && codigo === 'C' && expandida === 'C' && (
+                    <SecaoCViewer
+                      secao={secao}
+                      onEditPergunta={(p) => setModalPergunta({ secaoId: secao.id, item: p })}
+                      onDeletePergunta={excluirPergunta}
+                      onNovaPergunta={() => setModalPergunta({ secaoId: secao.id, item: null })}
+                    />
+                  )}
               );
             })
           )}
