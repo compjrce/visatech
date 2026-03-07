@@ -6,14 +6,14 @@ const { Pool } = require('pg');
 const dns = require('dns');
 require('dotenv').config();
 
-// ✅ CORREÇÃO: Forçar IPv4 — resolve ENETUNREACH com Supabase no Render
+// Forçar IPv4 — resolve ENETUNREACH com Supabase no Render
 dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 console.log('=================================');
-console.log('🔍 Verificando Environment Variables:');
+console.log('VISATech Backend v2');
 console.log('PORT:', process.env.PORT);
 console.log('DATABASE_URL existe?', !!process.env.DATABASE_URL);
 console.log('JWT_SECRET existe?', !!process.env.JWT_SECRET);
@@ -22,26 +22,19 @@ console.log('=================================');
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    const allowedOrigins = [
-      'https://visatech-admin.vercel.app',
-      'http://localhost:5173',
-    ];
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-      return callback(null, true);
-    }
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    }
+    const allowed = ['https://visatech-admin.vercel.app', 'http://localhost:5173'];
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) return callback(null, true);
+    if (allowed.includes(origin)) return callback(null, true);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
 
 if (!process.env.DATABASE_URL) {
-  console.error('❌ ERRO: DATABASE_URL não está definida!');
+  console.error('ERRO: DATABASE_URL não definida!');
   process.exit(1);
 }
 
@@ -50,15 +43,12 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: isLocal ? false : { rejectUnauthorized: false },
   connectionTimeoutMillis: 10000,
-  ...(isLocal ? {} : {
-    keepAlive: true,
-    keepAliveInitialDelayMillis: 0,
-  })
+  ...(isLocal ? {} : { keepAlive: true, keepAliveInitialDelayMillis: 0 }),
 });
 
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+// ── Middleware de autenticação ──
+const auth = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Token não fornecido' });
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: 'Token inválido' });
@@ -67,7 +57,9 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// ==================== AUTENTICAÇÃO ====================
+// ============================================================
+// AUTENTICAÇÃO
+// ============================================================
 
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -75,487 +67,397 @@ app.post('/api/auth/login', async (req, res) => {
     const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) return res.status(401).json({ error: 'Credenciais inválidas' });
     const user = result.rows[0];
-    const validPassword = await bcrypt.compare(password, user.password_hash);
-    if (!validPassword) return res.status(401).json({ error: 'Credenciais inválidas' });
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Credenciais inválidas' });
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, email: user.email, nome: user.nome, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '7d' }
     );
-    res.json({ token, user: { id: user.id, email: user.email, nome: user.nome, role: user.role, estabelecimento_id: user.estabelecimento_id } });
-  } catch (error) {
-    console.error('Erro no login:', error);
+    res.json({ token, user: { id: user.id, email: user.email, nome: user.nome, role: user.role } });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro no servidor' });
   }
 });
 
-// ==================== ESTABELECIMENTOS ====================
-
-app.get('/api/estabelecimentos', authenticateToken, async (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM estabelecimentos WHERE ativo = true ORDER BY razao_social');
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Erro ao listar estabelecimentos:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-app.get('/api/estabelecimentos/:id', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query('SELECT * FROM estabelecimentos WHERE id = $1', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Estabelecimento não encontrado' });
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao buscar estabelecimento:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-app.post('/api/estabelecimentos', authenticateToken, async (req, res) => {
-  try {
-    const { razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo } = req.body;
-    if (!razao_social || !cnpj) return res.status(400).json({ error: 'Razão social e CNPJ são obrigatórios' });
+    const { email, password, nome, role } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email e senha obrigatórios' });
+    const exists = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (exists.rows.length > 0) return res.status(400).json({ error: 'Email já cadastrado' });
+    const hash = await bcrypt.hash(password, 10);
     const result = await pool.query(
-      `INSERT INTO estabelecimentos (razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo ?? true]
+      'INSERT INTO users (email, password_hash, nome, role) VALUES ($1, $2, $3, $4) RETURNING id, email, nome, role',
+      [email, hash, nome, role || 'fiscal']
     );
     res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao criar estabelecimento:', error);
-    if (error.code === '23505') return res.status(400).json({ error: 'CNPJ já cadastrado' });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro no servidor' });
   }
 });
 
-app.put('/api/estabelecimentos/:id', authenticateToken, async (req, res) => {
+// ============================================================
+// ESTABELECIMENTOS
+// ============================================================
+
+// Lista todos
+app.get('/api/estabelecimentos', auth, async (req, res) => {
   try {
-    const { id } = req.params;
-    const { razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo } = req.body;
+    const result = await pool.query(
+      'SELECT * FROM estabelecimentos ORDER BY razao_social'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+// Busca por CNPJ — usado no fluxo de nova inspeção
+app.get('/api/estabelecimentos/cnpj/:cnpj', auth, async (req, res) => {
+  try {
+    // Remove máscara para comparar
+    const cnpj = req.params.cnpj.replace(/\D/g, '');
+    const result = await pool.query(
+      "SELECT * FROM estabelecimentos WHERE replace(replace(replace(cnpj, '.', ''), '/', ''), '-', '') = $1",
+      [cnpj]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Não encontrado' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+// Cria
+app.post('/api/estabelecimentos', auth, async (req, res) => {
+  try {
+    const { razao_social, nome_fantasia, cnpj, endereco, telefone, email } = req.body;
     if (!razao_social || !cnpj) return res.status(400).json({ error: 'Razão social e CNPJ são obrigatórios' });
     const result = await pool.query(
-      `UPDATE estabelecimentos SET razao_social=$1, nome_fantasia=$2, cnpj=$3, endereco=$4, telefone=$5, email=$6, ativo=$7
-       WHERE id=$8 RETURNING *`,
-      [razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo, id]
+      `INSERT INTO estabelecimentos (razao_social, nome_fantasia, cnpj, endereco, telefone, email)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [razao_social, nome_fantasia, cnpj, endereco, telefone, email]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Estabelecimento não encontrado' });
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao atualizar estabelecimento:', error);
-    if (error.code === '23505') return res.status(400).json({ error: 'CNPJ já cadastrado' });
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'CNPJ já cadastrado' });
+    console.error(err);
     res.status(500).json({ error: 'Erro no servidor' });
   }
 });
 
-app.delete('/api/estabelecimentos/:id', authenticateToken, async (req, res) => {
+// Atualiza
+app.put('/api/estabelecimentos/:id', auth, async (req, res) => {
   try {
-    const { id } = req.params;
-    const result = await pool.query('DELETE FROM estabelecimentos WHERE id = $1 RETURNING *', [id]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Estabelecimento não encontrado' });
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Erro ao excluir estabelecimento:', error);
-    if (error.code === '23503') return res.status(400).json({ error: 'Não é possível excluir: estabelecimento possui inspeções vinculadas' });
+    const { razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo } = req.body;
+    const result = await pool.query(
+      `UPDATE estabelecimentos SET razao_social=$1, nome_fantasia=$2, cnpj=$3,
+       endereco=$4, telefone=$5, email=$6, ativo=$7 WHERE id=$8 RETURNING *`,
+      [razao_social, nome_fantasia, cnpj, endereco, telefone, email, ativo ?? true, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Não encontrado' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ error: 'CNPJ já cadastrado' });
+    console.error(err);
     res.status(500).json({ error: 'Erro no servidor' });
   }
 });
 
-// ==================== QUESTIONÁRIOS ====================
+// Desativa
+app.delete('/api/estabelecimentos/:id', auth, async (req, res) => {
+  try {
+    await pool.query('UPDATE estabelecimentos SET ativo=false WHERE id=$1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
 
-app.get('/api/questionarios', authenticateToken, async (req, res) => {
+// ============================================================
+// INSPEÇÕES
+// ============================================================
+
+// Lista (com dados do estabelecimento)
+app.get('/api/inspecoes', auth, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT q.*,
-        (SELECT COUNT(*) FROM secoes WHERE questionario_id = q.id) as total_secoes,
-        e.razao_social as estabelecimento_nome,
-        e.nome_fantasia as estabelecimento_fantasia,
-        e.cnpj as estabelecimento_cnpj
-      FROM questionarios q
-      LEFT JOIN estabelecimentos e ON q.estabelecimento_id = e.id
-      WHERE q.ativo = true ORDER BY q.criado_em DESC
+      SELECT
+        i.*,
+        e.razao_social, e.nome_fantasia, e.cnpj,
+        u.nome as fiscal_nome
+      FROM inspecoes i
+      LEFT JOIN estabelecimentos e ON i.estabelecimento_id = e.id
+      LEFT JOIN users u ON i.fiscal_id = u.id
+      ORDER BY i.criado_em DESC
     `);
     res.json(result.rows);
-  } catch (error) {
-    console.error('Erro ao listar questionários:', error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro no servidor' });
   }
 });
 
-app.post('/api/questionarios', authenticateToken, async (req, res) => {
-  try {
-    const { titulo, descricao, tipo, versao, estabelecimento_id } = req.body;
-    if (!titulo) return res.status(400).json({ error: 'Título é obrigatório' });
-    const result = await pool.query(
-      `INSERT INTO questionarios (titulo, descricao, tipo, versao, estabelecimento_id, ativo)
-       VALUES ($1, $2, $3, $4, $5, true) RETURNING *`,
-      [titulo, descricao, tipo || 'INSPECAO_FARMACIA', versao || '05', estabelecimento_id || null]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao criar questionário:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-app.put('/api/questionarios/:id', authenticateToken, async (req, res) => {
+// Detalhe + todas as respostas
+app.get('/api/inspecoes/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { titulo, descricao, tipo, versao, estabelecimento_id, ativo } = req.body;
-    const result = await pool.query(
-      `UPDATE questionarios SET titulo=$1, descricao=$2, tipo=$3, versao=$4, estabelecimento_id=$5, ativo=$6
-       WHERE id=$7 RETURNING *`,
-      [titulo, descricao, tipo, versao, estabelecimento_id || null, ativo ?? true, id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Questionário não encontrado' });
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao atualizar questionário:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
 
-app.delete('/api/questionarios/:id', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('UPDATE questionarios SET ativo=false WHERE id=$1', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Erro ao excluir questionário:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-app.get('/api/questionarios/:id/completo', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const questionario = await pool.query(`
-      SELECT q.*, e.razao_social, e.nome_fantasia, e.cnpj, e.endereco, e.telefone, e.email
-      FROM questionarios q
-      LEFT JOIN estabelecimentos e ON q.estabelecimento_id = e.id
-      WHERE q.id = $1
-    `, [id]);
-    if (questionario.rows.length === 0) return res.status(404).json({ error: 'Questionário não encontrado' });
-    const secoes = await pool.query('SELECT * FROM secoes WHERE questionario_id = $1 ORDER BY ordem', [id]);
-    const secoesCompletas = await Promise.all(
-      secoes.rows.map(async (secao) => {
-        const perguntas = await pool.query('SELECT * FROM perguntas WHERE secao_id = $1 ORDER BY ordem', [secao.id]);
-        return { ...secao, perguntas: perguntas.rows };
-      })
-    );
-    res.json({ ...questionario.rows[0], secoes: secoesCompletas });
-  } catch (error) {
-    console.error('Erro ao buscar questionário:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-// ==================== INSPEÇÕES ====================
-
-app.post('/api/inspecoes', authenticateToken, async (req, res) => {
-  try {
-    const { questionario_id, estabelecimento_id, tipo_inspecao, dados_secao_a } = req.body;
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const inspecaoResult = await client.query(`
-        INSERT INTO inspecoes (questionario_id, estabelecimento_id, fiscal_responsavel_id, tipo_inspecao, data_inicio, status)
-        VALUES ($1, $2, $3, $4, NOW(), 'EM_ANDAMENTO') RETURNING *
-      `, [questionario_id, estabelecimento_id, req.user.id, tipo_inspecao]);
-      const inspecaoId = inspecaoResult.rows[0].id;
-      if (dados_secao_a) {
-        await client.query(`
-          INSERT INTO secao_a_dados (inspecao_id, acompanhante_vistoria, objetivo_inspecao, horario_funcionamento, numero_funcionarios, areas_fisicas, documentos)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [inspecaoId, dados_secao_a.acompanhante_vistoria, dados_secao_a.objetivo_inspecao, dados_secao_a.horario_funcionamento, dados_secao_a.numero_funcionarios, JSON.stringify(dados_secao_a.areas_fisicas || {}), JSON.stringify(dados_secao_a.documentos || {})]);
-      }
-      await client.query('COMMIT');
-      res.status(201).json(inspecaoResult.rows[0]);
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('Erro ao criar inspeção:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-app.post('/api/inspecoes/:id/validar-secao-b', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { respostas } = req.body;
-    const todasSim = respostas.every(r => r.resposta_opcao === 'SIM');
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      for (const resposta of respostas) {
-        await client.query(`
-          INSERT INTO respostas (inspecao_id, pergunta_id, user_id, resposta_opcao, observacao)
-          VALUES ($1, $2, $3, $4, $5)
-        `, [id, resposta.pergunta_id, req.user.id, resposta.resposta_opcao, resposta.observacao]);
-      }
-      await client.query(`
-        UPDATE inspecoes SET secao_b_aprovada = $1, status = $2 WHERE id = $3
-      `, [todasSim, todasSim ? 'EM_ANDAMENTO' : 'BLOQUEADA_B', id]);
-      await client.query('COMMIT');
-      res.json({ aprovada: todasSim, mensagem: todasSim ? 'Seção B aprovada.' : 'Seção B reprovada. Farmacêutico ausente.' });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('Erro ao validar Seção B:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-app.post('/api/inspecoes/:id/secao/:secao_codigo/respostas', authenticateToken, async (req, res) => {
-  try {
-    const { id, secao_codigo } = req.params;
-    const { respostas } = req.body;
-    const inspecao = await pool.query('SELECT status FROM inspecoes WHERE id = $1', [id]);
-    if (inspecao.rows[0].status === 'BLOQUEADA_B') {
-      return res.status(403).json({ error: 'Inspeção bloqueada - Seção B não aprovada' });
-    }
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(`
-        DELETE FROM respostas WHERE inspecao_id = $1 AND pergunta_id IN (
-          SELECT p.id FROM perguntas p JOIN secoes s ON p.secao_id = s.id WHERE s.codigo = $2
-        )
-      `, [id, secao_codigo]);
-      for (const resposta of respostas) {
-        await client.query(`
-          INSERT INTO respostas (inspecao_id, pergunta_id, user_id, resposta_texto, resposta_opcao, observacao)
-          VALUES ($1, $2, $3, $4, $5, $6)
-        `, [id, resposta.pergunta_id, req.user.id, resposta.resposta_texto, resposta.resposta_opcao, resposta.observacao]);
-      }
-      await client.query('COMMIT');
-      res.json({ success: true });
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('Erro ao salvar respostas:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-app.post('/api/inspecoes/:id/inventario', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { medicamento, estoque_fisico, estoque_escriturado, observacao } = req.body;
-    const result = await pool.query(`
-      INSERT INTO inventario_medicamentos (inspecao_id, medicamento, estoque_fisico, estoque_escriturado, observacao, ordem)
-      VALUES ($1, $2, $3, $4, $5, (SELECT COALESCE(MAX(ordem), 0) + 1 FROM inventario_medicamentos WHERE inspecao_id = $1))
-      RETURNING *
-    `, [id, medicamento, estoque_fisico, estoque_escriturado, observacao]);
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao adicionar inventário:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-app.get('/api/inspecoes/:id', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const inspecao = await pool.query(`
+    const insp = await pool.query(`
       SELECT i.*, e.razao_social, e.nome_fantasia, e.cnpj,
-        u.nome as fiscal_nome, q.titulo as questionario_titulo
+        e.endereco, e.telefone, e.email as estab_email,
+        u.nome as fiscal_nome
       FROM inspecoes i
-      JOIN estabelecimentos e ON i.estabelecimento_id = e.id
-      JOIN users u ON i.fiscal_responsavel_id = u.id
-      JOIN questionarios q ON i.questionario_id = q.id
+      LEFT JOIN estabelecimentos e ON i.estabelecimento_id = e.id
+      LEFT JOIN users u ON i.fiscal_id = u.id
       WHERE i.id = $1
     `, [id]);
-    if (inspecao.rows.length === 0) return res.status(404).json({ error: 'Inspeção não encontrada' });
-    const respostas = await pool.query(`
-      SELECT r.*, p.texto as pergunta_texto, s.codigo as secao_codigo
-      FROM respostas r JOIN perguntas p ON r.pergunta_id = p.id JOIN secoes s ON p.secao_id = s.id
-      WHERE r.inspecao_id = $1 ORDER BY s.ordem, p.ordem
-    `, [id]);
-    const inventario = await pool.query('SELECT * FROM inventario_medicamentos WHERE inspecao_id = $1 ORDER BY ordem', [id]);
-    res.json({ ...inspecao.rows[0], respostas: respostas.rows, inventario: inventario.rows });
-  } catch (error) {
-    console.error('Erro ao buscar inspeção:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
 
-app.put('/api/inspecoes/:id/finalizar', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { observacoes_gerais } = req.body;
-    const result = await pool.query(`
-      UPDATE inspecoes SET status = 'FINALIZADA', data_fim = NOW(), observacoes_gerais = $1
-      WHERE id = $2 RETURNING *
-    `, [observacoes_gerais, id]);
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao finalizar inspeção:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
+    if (insp.rows.length === 0) return res.status(404).json({ error: 'Não encontrada' });
 
-app.get('/api/inspecoes', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT i.*, e.razao_social, e.nome_fantasia, u.nome as fiscal_nome, q.titulo as questionario_titulo
-      FROM inspecoes i
-      JOIN estabelecimentos e ON i.estabelecimento_id = e.id
-      JOIN users u ON i.fiscal_responsavel_id = u.id
-      JOIN questionarios q ON i.questionario_id = q.id
-      ORDER BY i.data_inicio DESC
-    `);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Erro ao listar inspeções:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
-
-
-// ==================== SEÇÕES ====================
-
-app.get('/api/questionarios/:id/secoes', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const secoes = await pool.query('SELECT * FROM secoes WHERE questionario_id = $1 ORDER BY ordem', [id]);
-    const secoesCompletas = await Promise.all(
-      secoes.rows.map(async (secao) => {
-        const perguntas = await pool.query('SELECT * FROM perguntas WHERE secao_id = $1 ORDER BY ordem', [secao.id]);
-        return { ...secao, perguntas: perguntas.rows };
-      })
+    const respostas = await pool.query(
+      'SELECT secao, campo, valor FROM respostas WHERE inspecao_id = $1 ORDER BY secao, id',
+      [id]
     );
-    res.json(secoesCompletas);
-  } catch (error) {
-    console.error('Erro ao listar seções:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
 
-app.post('/api/questionarios/:id/secoes', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { codigo, titulo, descricao, tipo_secao, bloqueante, exige_farmaceutico } = req.body;
-    if (!codigo || !titulo || !tipo_secao) {
-      return res.status(400).json({ error: 'Código, título e tipo são obrigatórios' });
+    const inventario = await pool.query(
+      'SELECT * FROM inventario_itens WHERE inspecao_id = $1 ORDER BY ordem',
+      [id]
+    );
+
+    // Organiza respostas por seção
+    const respostasPorSecao = {};
+    for (const r of respostas.rows) {
+      if (!respostasPorSecao[r.secao]) respostasPorSecao[r.secao] = {};
+      respostasPorSecao[r.secao][r.campo] = r.valor;
     }
-    // Calcula próxima ordem
-    const ordemResult = await pool.query(
-      'SELECT COALESCE(MAX(ordem), 0) + 1 as proxima FROM secoes WHERE questionario_id = $1', [id]
-    );
-    const ordem = ordemResult.rows[0].proxima;
-    const result = await pool.query(
-      `INSERT INTO secoes (questionario_id, codigo, titulo, descricao, ordem, tipo_secao, bloqueante, exige_farmaceutico)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [id, codigo.toUpperCase(), titulo, descricao, ordem, tipo_secao, bloqueante || false, exige_farmaceutico || false]
-    );
-    res.status(201).json({ ...result.rows[0], perguntas: [] });
-  } catch (error) {
-    console.error('Erro ao criar seção:', error);
-    if (error.code === '23505') return res.status(400).json({ error: 'Já existe uma seção com este código neste roteiro' });
+
+    res.json({
+      ...insp.rows[0],
+      respostas: respostasPorSecao,
+      inventario: inventario.rows,
+    });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro no servidor' });
   }
 });
 
-app.put('/api/secoes/:id', authenticateToken, async (req, res) => {
+// Cria inspeção
+// Body: { estabelecimento_id?, razao_social, nome_fantasia, cnpj, endereco?, telefone?, email? }
+// Se não tiver estabelecimento_id mas tiver CNPJ, busca ou cria o estabelecimento
+app.post('/api/inspecoes', auth, async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { id } = req.params;
-    const { titulo, descricao, tipo_secao, bloqueante, exige_farmaceutico } = req.body;
-    const result = await pool.query(
-      `UPDATE secoes SET titulo=$1, descricao=$2, tipo_secao=$3, bloqueante=$4, exige_farmaceutico=$5
-       WHERE id=$6 RETURNING *`,
-      [titulo, descricao, tipo_secao, bloqueante, exige_farmaceutico, id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Seção não encontrada' });
-    res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao atualizar seção:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
+    await client.query('BEGIN');
 
-app.delete('/api/secoes/:id', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM secoes WHERE id = $1', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Erro ao excluir seção:', error);
-    res.status(500).json({ error: 'Erro no servidor' });
-  }
-});
+    let { estabelecimento_id, razao_social, nome_fantasia, cnpj, endereco, telefone, email } = req.body;
 
-// ==================== PERGUNTAS ====================
+    // Resolve estabelecimento
+    if (!estabelecimento_id) {
+      if (!cnpj) return res.status(400).json({ error: 'CNPJ ou estabelecimento_id é obrigatório' });
 
-app.post('/api/secoes/:id/perguntas', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { texto, tipo_resposta, obrigatoria, referencia_legal } = req.body;
-    if (!texto || !tipo_resposta) {
-      return res.status(400).json({ error: 'Texto e tipo de resposta são obrigatórios' });
+      const cnpjLimpo = cnpj.replace(/\D/g, '');
+      const existe = await client.query(
+        "SELECT id FROM estabelecimentos WHERE replace(replace(replace(cnpj,'.',''),'/',''),'-','') = $1",
+        [cnpjLimpo]
+      );
+
+      if (existe.rows.length > 0) {
+        estabelecimento_id = existe.rows[0].id;
+        // Atualiza dados se vieram no payload
+        if (razao_social) {
+          await client.query(
+            `UPDATE estabelecimentos SET razao_social=$1, nome_fantasia=$2,
+             endereco=$3, telefone=$4, email=$5 WHERE id=$6`,
+            [razao_social, nome_fantasia, endereco, telefone, email, estabelecimento_id]
+          );
+        }
+      } else {
+        if (!razao_social) return res.status(400).json({ error: 'Razão social obrigatória para novo estabelecimento' });
+        const novo = await client.query(
+          `INSERT INTO estabelecimentos (razao_social, nome_fantasia, cnpj, endereco, telefone, email)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+          [razao_social, nome_fantasia, cnpj, endereco, telefone, email]
+        );
+        estabelecimento_id = novo.rows[0].id;
+      }
     }
-    const ordemResult = await pool.query(
-      'SELECT COALESCE(MAX(ordem), 0) + 1 as proxima FROM perguntas WHERE secao_id = $1', [id]
+
+    const result = await client.query(
+      `INSERT INTO inspecoes (estabelecimento_id, fiscal_id, status, secao_atual)
+       VALUES ($1, $2, 'EM_ANDAMENTO', 'A') RETURNING *`,
+      [estabelecimento_id, req.user.id]
     );
-    const ordem = ordemResult.rows[0].proxima;
-    const result = await pool.query(
-      `INSERT INTO perguntas (secao_id, texto, ordem, obrigatoria, tipo_resposta, referencia_legal)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [id, texto, ordem, obrigatoria || false, tipo_resposta, referencia_legal]
-    );
+
+    await client.query('COMMIT');
     res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao criar pergunta:', error);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
     res.status(500).json({ error: 'Erro no servidor' });
+  } finally {
+    client.release();
   }
 });
 
-app.put('/api/perguntas/:id', authenticateToken, async (req, res) => {
+// Salva respostas de uma seção (upsert)
+// Body: { secao: 'B', respostas: { campo: valor, ... } }
+app.post('/api/inspecoes/:id/respostas', auth, async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+
     const { id } = req.params;
-    const { texto, tipo_resposta, obrigatoria, referencia_legal, ordem } = req.body;
+    const { secao, respostas } = req.body;
+
+    if (!secao || !respostas) return res.status(400).json({ error: 'secao e respostas são obrigatórios' });
+
+    // Verifica se inspeção existe e não está finalizada
+    const insp = await client.query('SELECT * FROM inspecoes WHERE id = $1', [id]);
+    if (insp.rows.length === 0) return res.status(404).json({ error: 'Inspeção não encontrada' });
+    if (['FINALIZADA', 'CANCELADA'].includes(insp.rows[0].status)) {
+      return res.status(400).json({ error: 'Inspeção já encerrada' });
+    }
+
+    // Upsert de cada campo
+    for (const [campo, valor] of Object.entries(respostas)) {
+      await client.query(
+        `INSERT INTO respostas (inspecao_id, secao, campo, valor)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (inspecao_id, secao, campo)
+         DO UPDATE SET valor = EXCLUDED.valor`,
+        [id, secao, campo, valor !== null && valor !== undefined ? String(valor) : null]
+      );
+    }
+
+    // Lógica de bloqueio seção B
+    let novoStatus = insp.rows[0].status;
+    let secaoB_aprovada = insp.rows[0].secao_b_aprovada;
+
+    if (secao === 'B') {
+      const vals = Object.values(respostas);
+      const bloqueado = vals.some(v => v === 'NAO' || v === 'nao');
+      novoStatus = bloqueado ? 'BLOQUEADA_B' : 'EM_ANDAMENTO';
+      secaoB_aprovada = !bloqueado;
+      await client.query(
+        'UPDATE inspecoes SET status=$1, secao_b_aprovada=$2, secao_atual=$3 WHERE id=$4',
+        [novoStatus, secaoB_aprovada, bloqueado ? 'B' : 'C', id]
+      );
+    } else {
+      // Avança seção atual para a próxima
+      const ordem = ['A','B','C','D','E','F','G','H'];
+      const idx = ordem.indexOf(secao);
+      const proxima = idx >= 0 && idx < ordem.length - 1 ? ordem[idx + 1] : secao;
+      await client.query(
+        'UPDATE inspecoes SET secao_atual=$1 WHERE id=$2 AND secao_atual=$3',
+        [proxima, id, secao]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, status: novoStatus, secao_b_aprovada });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Erro no servidor' });
+  } finally {
+    client.release();
+  }
+});
+
+// Finaliza inspeção
+app.put('/api/inspecoes/:id/finalizar', auth, async (req, res) => {
+  try {
     const result = await pool.query(
-      `UPDATE perguntas SET texto=$1, tipo_resposta=$2, obrigatoria=$3, referencia_legal=$4, ordem=$5
-       WHERE id=$6 RETURNING *`,
-      [texto, tipo_resposta, obrigatoria, referencia_legal, ordem, id]
+      `UPDATE inspecoes SET status='FINALIZADA', finalizado_em=NOW(), secao_atual='H'
+       WHERE id=$1 AND status='EM_ANDAMENTO' RETURNING *`,
+      [req.params.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Pergunta não encontrada' });
+    if (result.rows.length === 0) return res.status(400).json({ error: 'Inspeção não encontrada ou não pode ser finalizada' });
     res.json(result.rows[0]);
-  } catch (error) {
-    console.error('Erro ao atualizar pergunta:', error);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro no servidor' });
   }
 });
 
-app.delete('/api/perguntas/:id', authenticateToken, async (req, res) => {
+// Cancela inspeção
+app.put('/api/inspecoes/:id/cancelar', auth, async (req, res) => {
   try {
-    const { id } = req.params;
-    await pool.query('DELETE FROM perguntas WHERE id = $1', [id]);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Erro ao excluir pergunta:', error);
+    const result = await pool.query(
+      `UPDATE inspecoes SET status='CANCELADA', finalizado_em=NOW()
+       WHERE id=$1 AND status NOT IN ('FINALIZADA','CANCELADA') RETURNING *`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(400).json({ error: 'Inspeção não encontrada ou já encerrada' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro no servidor' });
   }
 });
 
-// ==================== HEALTH CHECK ====================
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date(), version: 'v1' });
+// ============================================================
+// INVENTÁRIO (Seção H)
+// ============================================================
+
+// Salva itens do inventário (substitui todos)
+app.post('/api/inspecoes/:id/inventario', auth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { id } = req.params;
+    const { itens } = req.body; // [{ medicamento, estoque_fisico, estoque_escrit }]
+
+    await client.query('DELETE FROM inventario_itens WHERE inspecao_id = $1', [id]);
+
+    for (let i = 0; i < (itens || []).length; i++) {
+      const it = itens[i];
+      await client.query(
+        `INSERT INTO inventario_itens (inspecao_id, medicamento, estoque_fisico, estoque_escrit, ordem)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, it.medicamento, it.estoque_fisico ?? null, it.estoque_escrit ?? null, i + 1]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Erro no servidor' });
+  } finally {
+    client.release();
+  }
 });
+
+// Lista inventário
+app.get('/api/inspecoes/:id/inventario', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM inventario_itens WHERE inspecao_id=$1 ORDER BY ordem',
+      [req.params.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro no servidor' });
+  }
+});
+
+// ============================================================
+// HEALTH CHECK
+// ============================================================
+
+app.get('/health', (req, res) => res.json({ status: 'ok', version: '2.0' }));
 
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`VISATech API v2 rodando na porta ${PORT}`);
 });
