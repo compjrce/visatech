@@ -1,66 +1,70 @@
+// models/inspecao.dart
+import 'estabelecimento.dart';
+
+export 'estabelecimento.dart';
+
 class Inspecao {
   final int id;
-  final int questionarioId;
-  final int estabelecimentoId;
-  final int fiscalResponsavelId;
-  final String? tipoInspecao;
-  final DateTime dataInicio;
-  final DateTime? dataFim;
-  final String status; // 'EM_ANDAMENTO', 'BLOQUEADA_B', 'FINALIZADA', 'CANCELADA'
+  final int? estabelecimentoId;
+  final String status;
+  final String secaoAtual;
   final bool secaoBAprovada;
-  final String? observacoesGerais;
+  final DateTime criadoEm;
+  final DateTime? finalizadoEm;
+
+  // Dados desnormalizados do JOIN
+  final String? razaoSocial;
+  final String? nomeFantasia;
+  final String? cnpj;
+  final String? fiscalNome;
+
+  // Respostas organizadas por seção (só no detalhe)
+  final Map<String, Map<String, String>>? respostas;
 
   Inspecao({
     required this.id,
-    required this.questionarioId,
-    required this.estabelecimentoId,
-    required this.fiscalResponsavelId,
-    this.tipoInspecao,
-    required this.dataInicio,
-    this.dataFim,
+    this.estabelecimentoId,
     required this.status,
+    required this.secaoAtual,
     required this.secaoBAprovada,
-    this.observacoesGerais,
+    required this.criadoEm,
+    this.finalizadoEm,
+    this.razaoSocial,
+    this.nomeFantasia,
+    this.cnpj,
+    this.fiscalNome,
+    this.respostas,
   });
 
   factory Inspecao.fromJson(Map<String, dynamic> json) {
+    Map<String, Map<String, String>>? respostas;
+    if (json['respostas'] != null) {
+      respostas = {};
+      (json['respostas'] as Map<String, dynamic>).forEach((secao, campos) {
+        respostas![secao] = Map<String, String>.from(
+          (campos as Map<String, dynamic>).map((k, v) => MapEntry(k, v?.toString() ?? '')),
+        );
+      });
+    }
+
     return Inspecao(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      questionarioId: json['questionario_id'] is int 
-          ? json['questionario_id'] 
-          : int.parse(json['questionario_id'].toString()),
-      estabelecimentoId: json['estabelecimento_id'] is int 
-          ? json['estabelecimento_id'] 
-          : int.parse(json['estabelecimento_id'].toString()),
-      fiscalResponsavelId: json['fiscal_responsavel_id'] is int 
-          ? json['fiscal_responsavel_id'] 
-          : int.parse(json['fiscal_responsavel_id'].toString()),
-      tipoInspecao: json['tipo_inspecao'],
-      dataInicio: DateTime.parse(json['data_inicio']),
-      dataFim: json['data_fim'] != null ? DateTime.parse(json['data_fim']) : null,
-      status: json['status'],
-      secaoBAprovada: json['secao_b_aprovada'] == true || json['secao_b_aprovada'] == 1,
-      observacoesGerais: json['observacoes_gerais'],
+      estabelecimentoId: json['estabelecimento_id'] is int
+          ? json['estabelecimento_id']
+          : int.tryParse(json['estabelecimento_id']?.toString() ?? ''),
+      status: json['status'] ?? 'EM_ANDAMENTO',
+      secaoAtual: json['secao_atual'] ?? 'A',
+      secaoBAprovada: json['secao_b_aprovada'] == true,
+      criadoEm: DateTime.parse(json['criado_em']),
+      finalizadoEm: json['finalizado_em'] != null ? DateTime.parse(json['finalizado_em']) : null,
+      razaoSocial: json['razao_social'],
+      nomeFantasia: json['nome_fantasia'],
+      cnpj: json['cnpj'],
+      fiscalNome: json['fiscal_nome'],
+      respostas: respostas,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'questionario_id': questionarioId,
-      'estabelecimento_id': estabelecimentoId,
-      'fiscal_responsavel_id': fiscalResponsavelId,
-      'tipo_inspecao': tipoInspecao,
-      'data_inicio': dataInicio.toIso8601String(),
-      'data_fim': dataFim?.toIso8601String(),
-      'status': status,
-      'secao_b_aprovada': secaoBAprovada,
-      'observacoes_gerais': observacoesGerais,
-    };
-  }
-
-  bool get emAndamento => status == 'EM_ANDAMENTO';
-  bool get bloqueada => status == 'BLOQUEADA_B';
-  bool get finalizada => status == 'FINALIZADA';
-  bool get cancelada => status == 'CANCELADA';
+  String get nomeExibicao =>
+      nomeFantasia?.isNotEmpty == true ? nomeFantasia! : razaoSocial ?? 'Inspeção #$id';
 }

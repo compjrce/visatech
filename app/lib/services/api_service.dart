@@ -1,8 +1,7 @@
+// services/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../models/user.dart';
-import '../models/questionario.dart';
-import '../models/resposta.dart';
+import '../models/inspecao.dart';
 
 class ApiService {
   static const String baseUrl = 'https://visatech-backend.onrender.com/api';
@@ -11,184 +10,149 @@ class ApiService {
 
   void setToken(String token) => _token = token;
   void clearToken() => _token = null;
+  bool get hasToken => _token != null;
 
-  Map<String, String> get _headers {
-    final headers = {'Content-Type': 'application/json'};
-    if (_token != null) headers['Authorization'] = 'Bearer $_token';
-    return headers;
+  Map<String, String> get _headers => {
+        'Content-Type': 'application/json',
+        if (_token != null) 'Authorization': 'Bearer $_token',
+      };
+
+  // ── helper ──
+  Map<String, dynamic> _parseResponse(http.Response res) {
+    final body = jsonDecode(res.body);
+    if (res.statusCode >= 400) {
+      throw Exception(body['error'] ?? 'Erro ${res.statusCode}');
+    }
+    return body is Map<String, dynamic> ? body : {'data': body};
   }
 
-  // ==================== AUTENTICAÇÃO ====================
+  // ============================================================
+  // AUTH
+  // ============================================================
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final response = await http.post(
+    final res = await http.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password}),
     );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      _token = data['token'];
-      return {'token': data['token'], 'user': User.fromJson(data['user'])};
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao fazer login');
-    }
+    final data = _parseResponse(res);
+    _token = data['token'];
+    return data;
   }
 
-  // ==================== QUESTIONÁRIOS ====================
+  // ============================================================
+  // ESTABELECIMENTOS
+  // ============================================================
 
-  Future<List<Questionario>> getQuestionarios() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/questionarios'),
+  // Busca estabelecimento pelo CNPJ (só dígitos ou formatado)
+  Future<Estabelecimento?> buscarPorCnpj(String cnpj) async {
+    final cnpjLimpo = cnpj.replaceAll(RegExp(r'\D'), '');
+    final res = await http.get(
+      Uri.parse('$baseUrl/estabelecimentos/cnpj/$cnpjLimpo'),
       headers: _headers,
     );
-
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.map((q) => Questionario.fromJson(q)).toList();
-    } else {
-      throw Exception('Erro ao buscar questionários');
-    }
+    if (res.statusCode == 404) return null;
+    return Estabelecimento.fromJson(_parseResponse(res));
   }
 
-  // Usa o endpoint /completo que retorna seções + perguntas
-  Future<Questionario> getQuestionario(int id) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/questionarios/$id/completo'),
-      headers: _headers,
-    );
-
-    if (response.statusCode == 200) {
-      return Questionario.fromJson(jsonDecode(response.body));
-    } else {
-      throw Exception('Erro ao buscar questionário');
-    }
-  }
-
-  // ==================== INSPEÇÕES ====================
-
-  Future<Map<String, dynamic>> criarInspecao({
-    required int questionarioId,
-    required int estabelecimentoId,
-    String? tipoInspecao,
-    Map<String, dynamic>? dadosSecaoA,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/inspecoes'),
-      headers: _headers,
-      body: jsonEncode({
-        'questionario_id': questionarioId,
-        'estabelecimento_id': estabelecimentoId,
-        'tipo_inspecao': tipoInspecao,
-        'dados_secao_a': dadosSecaoA,
-      }),
-    );
-
-    if (response.statusCode == 201) {
-      return jsonDecode(response.body);
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao criar inspeção');
-    }
-  }
-
-  Future<Map<String, dynamic>> validarSecaoB(
-    int inspecaoId,
-    List<Resposta> respostas,
-  ) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/inspecoes/$inspecaoId/validar-secao-b'),
-      headers: _headers,
-      body: jsonEncode({
-        'respostas': respostas.map((r) => r.toJson()).toList(),
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao validar Seção B');
-    }
-  }
-
-  Future<void> salvarRespostasSecao(
-    int inspecaoId,
-    String secaoCodigo,
-    List<Resposta> respostas,
-  ) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/inspecoes/$inspecaoId/secao/$secaoCodigo/respostas'),
-      headers: _headers,
-      body: jsonEncode({
-        'respostas': respostas.map((r) => r.toJson()).toList(),
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao salvar respostas');
-    }
-  }
-
-  Future<Map<String, dynamic>> finalizarInspecao(
-    int inspecaoId, {
-    String? observacoesGerais,
-  }) async {
-    final response = await http.put(
-      Uri.parse('$baseUrl/inspecoes/$inspecaoId/finalizar'),
-      headers: _headers,
-      body: jsonEncode({'observacoes_gerais': observacoesGerais}),
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao finalizar inspeção');
-    }
-  }
-
-  Future<List<dynamic>> getAuditorias() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/inspecoes'),
-      headers: _headers,
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Erro ao buscar inspeções');
-    }
-  }
-
-  Future<Map<String, dynamic>> getAuditoria(int id) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/inspecoes/$id'),
-      headers: _headers,
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Erro ao buscar inspeção');
-    }
-  }
-
-  // ==================== ESTABELECIMENTOS ====================
-
-  Future<List<dynamic>> getEstabelecimentos() async {
-    final response = await http.get(
+  Future<List<Estabelecimento>> listarEstabelecimentos() async {
+    final res = await http.get(
       Uri.parse('$baseUrl/estabelecimentos'),
       headers: _headers,
     );
+    final List data = jsonDecode(res.body);
+    return data.map((e) => Estabelecimento.fromJson(e)).toList();
+  }
 
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+  // ============================================================
+  // INSPEÇÕES
+  // ============================================================
+
+  Future<List<Inspecao>> listarInspecoes() async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/inspecoes'),
+      headers: _headers,
+    );
+    final List data = jsonDecode(res.body);
+    return data.map((i) => Inspecao.fromJson(i)).toList();
+  }
+
+  Future<Inspecao> detalheInspecao(int id) async {
+    final res = await http.get(
+      Uri.parse('$baseUrl/inspecoes/$id'),
+      headers: _headers,
+    );
+    return Inspecao.fromJson(_parseResponse(res));
+  }
+
+  // Cria inspeção.
+  // Se o estabelecimento já existir no banco, passa só o estabelecimento_id.
+  // Se for novo, passa os dados completos e o backend cria.
+  Future<Inspecao> criarInspecao({
+    int? estabelecimentoId,
+    String? razaoSocial,
+    String? nomeFantasia,
+    required String cnpj,
+    String? endereco,
+    String? telefone,
+    String? email,
+  }) async {
+    final body = <String, dynamic>{'cnpj': cnpj};
+    if (estabelecimentoId != null) {
+      body['estabelecimento_id'] = estabelecimentoId;
     } else {
-      throw Exception('Erro ao buscar estabelecimentos');
+      body['razao_social'] = razaoSocial;
+      if (nomeFantasia != null) body['nome_fantasia'] = nomeFantasia;
+      if (endereco != null) body['endereco'] = endereco;
+      if (telefone != null) body['telefone'] = telefone;
+      if (email != null) body['email'] = email;
     }
+
+    final res = await http.post(
+      Uri.parse('$baseUrl/inspecoes'),
+      headers: _headers,
+      body: jsonEncode(body),
+    );
+    return Inspecao.fromJson(_parseResponse(res));
+  }
+
+  // Salva respostas de uma seção (upsert).
+  // Retorna o novo status e se seção B foi aprovada.
+  Future<Map<String, dynamic>> salvarRespostas(
+    int inspecaoId,
+    String secao,
+    Map<String, String?> respostas,
+  ) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/inspecoes/$inspecaoId/respostas'),
+      headers: _headers,
+      body: jsonEncode({'secao': secao, 'respostas': respostas}),
+    );
+    return _parseResponse(res);
+  }
+
+  Future<Inspecao> finalizarInspecao(int id) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/inspecoes/$id/finalizar'),
+      headers: _headers,
+    );
+    return Inspecao.fromJson(_parseResponse(res));
+  }
+
+  // ============================================================
+  // INVENTÁRIO (Seção H)
+  // ============================================================
+
+  Future<void> salvarInventario(
+    int inspecaoId,
+    List<Map<String, dynamic>> itens,
+  ) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/inspecoes/$inspecaoId/inventario'),
+      headers: _headers,
+      body: jsonEncode({'itens': itens}),
+    );
+    _parseResponse(res);
   }
 }
