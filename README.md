@@ -1,32 +1,28 @@
-# 📱 VISATech - Sistema de Auditoria e Inspeção
+# 📱 VISATech — Sistema de Inspeção Farmacêutica
 
-Sistema completo para gestão de questionários, auditorias e relatórios, com app Android e painel web administrativo.
+Sistema completo para realização e gestão de inspeções sanitárias em farmácias e drogarias conforme a **RDC 44/2009**.
 
 ## 🌐 URLs em Produção
 
-- **Backend API**: https://visatech-backend.onrender.com
-- **Painel Web**: https://visatech-admin.vercel.app
-- **Documentação API**: [docs/API.md](docs/API.md)
+| Serviço | URL |
+|---------|-----|
+| Backend API | https://visatech-backend.onrender.com |
+| Painel Web | https://visatech-admin.vercel.app |
 
-## 🎯 Visão Geral
-
-O VISATech permite que auditores respondam questionários personalizados através de um app Android, enquanto administradores gerenciam estabelecimentos, questionários e visualizam relatórios através de um painel web.
+---
 
 ## 🏗️ Arquitetura
 
 ```
 ┌─────────────────┐
-│  App Android    │
+│   App Android   │
 │   (Flutter)     │
 └────────┬────────┘
-         │
-         │ API REST
-         │
+         │ API REST (JWT)
 ┌────────▼────────┐      ┌──────────────┐
 │   Backend API   │◄─────┤  Painel Web  │
-│  (Node.js)      │      │   (React)    │
+│   (Node.js)     │      │   (React)    │
 └────────┬────────┘      └──────────────┘
-         │
          │
 ┌────────▼────────┐
 │   PostgreSQL    │
@@ -34,267 +30,214 @@ O VISATech permite que auditores respondam questionários personalizados atravé
 └─────────────────┘
 ```
 
+---
+
 ## 🚀 Tecnologias
 
-### Backend
-- **Node.js** + Express
-- **PostgreSQL** (Supabase)
-- **JWT** para autenticação
-- **bcryptjs** para hash de senhas
+- **Backend:** Node.js + Express + PostgreSQL (Supabase) + JWT
+- **Web Admin:** React + Vite + Tailwind CSS
+- **App Mobile:** Flutter (Android)
 
-### Frontend Web
-- **React** + Vite
-- **Tailwind CSS** (via CDN)
-- **Lucide React** (ícones)
-
-### Mobile (Fase 2)
-- **Flutter** + Dart
-- **SQLite** para modo offline
-- **HTTP/Dio** para API
+---
 
 ## 📁 Estrutura do Projeto
 
 ```
 visatech/
+├── app/                        # App Flutter (Android)
+│   └── lib/
+│       ├── main.dart
+│       ├── models/
+│       │   ├── campos.dart         # Perguntas fixas das seções A–H
+│       │   ├── estabelecimento.dart
+│       │   ├── inspecao.dart
+│       │   └── user.dart
+│       ├── screens/
+│       │   ├── home_screen.dart
+│       │   ├── login_screen.dart
+│       │   ├── nova_inspecao_screen.dart
+│       │   ├── inspecao_screen.dart
+│       │   ├── inspecoes_screen.dart
+│       │   ├── secao_screen.dart
+│       │   └── resultado_screen.dart
+│       ├── services/
+│       │   ├── api_service.dart
+│       │   └── auth_service.dart
+│       └── providers/
+│           └── theme_provider.dart
 ├── backend/
-│   ├── server.js           # API principal
-│   ├── package.json
-│   └── .env                # Variáveis de ambiente
+│   ├── server.js               # API principal
+│   └── package.json
 ├── web-admin/
-│   ├── src/
-│   │   └── App.jsx         # Aplicação React
-│   ├── package.json
-│   └── vite.config.js
-├── mobile-app/             # (Fase 2 - Flutter)
-│   └── ...
+│   └── src/
+│       └── App.jsx             # Painel administrativo React
 ├── database/
-│   └── schema.sql          # Schema do banco
+│   └── schema.sql
 ├── docs/
-│   └── DEPLOY.md          # Guia de deploy
+│   └── API.md
 └── README.md
 ```
 
-## 🎨 Funcionalidades
-
-### Painel Web (Admin)
-- ✅ Login com JWT
-- ✅ CRUD de Estabelecimentos
-- ✅ CRUD de Questionários
-- ✅ Visualização de Relatórios
-- ✅ Criação de perguntas personalizadas
-- ✅ Associação de questionários a estabelecimentos
-
-### App Android (Auditor)
-- 🔲 Login com JWT
-- 🔲 Listagem de questionários
-- 🔲 Interface de resposta (SIM/NÃO/N/A)
-- 🔲 Modo offline
-- 🔲 Sincronização de dados
-- 🔲 Histórico de auditorias
+---
 
 ## 🗄️ Modelo de Dados
 
-```sql
+As perguntas das seções A–H são **fixas no código** (`campos.dart`). O banco armazena apenas as respostas.
+
+```
 users
-├── id
-├── email
-├── password_hash
-├── role (admin/auditor)
-└── estabelecimento_id
+├── id, email, password_hash, role, nome
 
 estabelecimentos
-├── id
-├── nome
-├── cnpj
-└── ativo
+├── id, razao_social, nome_fantasia, cnpj (unique)
+├── endereco, telefone, email, ativo
 
-questionarios
-├── id
-├── titulo
-├── descricao
-└── estabelecimento_id
-
-perguntas
-├── id
-├── questionario_id
-├── texto
-├── ordem
-└── obrigatoria
-
-auditorias
-├── id
-├── questionario_id
-├── user_id
-├── data_inicio
-└── data_fim
+inspecoes
+├── id, estabelecimento_id, fiscal_id
+├── status (EM_ANDAMENTO | BLOQUEADA_B | FINALIZADA | CANCELADA)
+├── secao_atual, secao_b_aprovada
+├── criado_em, finalizado_em
 
 respostas
-├── id
-├── auditoria_id
-├── pergunta_id
-├── resposta (SIM/NAO/NAO_SE_APLICA)
-└── observacao
+├── id, inspecao_id, secao, campo, valor
+├── UNIQUE (inspecao_id, secao, campo)
+
+inventario_itens
+├── id, inspecao_id, medicamento, quantidade, validade, lote
 ```
 
-## 🔧 Instalação Local
-
-### Pré-requisitos
-- Node.js 18+
-- npm ou yarn
-- Conta no Supabase (grátis)
-
-### Backend
-
-```bash
-cd backend
-npm install
-
-# Configurar .env
-cp .env.example .env
-# Editar .env com suas credenciais
-
-# Rodar servidor
-npm run dev
-```
-
-### Web Admin
-
-```bash
-cd web-admin
-npm install
-
-# Rodar em desenvolvimento
-npm run dev
-```
-
-Acesse: http://localhost:5173
-
-## 🚀 Deploy
-
-Siga o guia completo em `docs/DEPLOY.md`
-
-### Quick Deploy
-
-1. **Banco de Dados**: Criar projeto no Supabase e executar `schema.sql`
-2. **Backend**: Deploy no Render conectando ao GitHub
-3. **Frontend**: Deploy no Vercel conectando ao GitHub
-
-## 🔐 Segurança
-
-- Senhas hasheadas com bcrypt (10 rounds)
-- Autenticação via JWT
-- Tokens expiram em 24h
-- CORS configurado
-- Variáveis sensíveis em .env
-- SQL injection prevenido (prepared statements)
+---
 
 ## 🌐 Endpoints da API
 
-### Autenticação
+### Auth
 ```
 POST /api/auth/login
-POST /api/auth/register (apenas admin)
+POST /api/auth/register
 ```
 
 ### Estabelecimentos
 ```
 GET    /api/estabelecimentos
-POST   /api/estabelecimentos (admin)
-PUT    /api/estabelecimentos/:id (admin)
-DELETE /api/estabelecimentos/:id (admin)
+GET    /api/estabelecimentos/cnpj/:cnpj
+POST   /api/estabelecimentos
+PUT    /api/estabelecimentos/:id
+DELETE /api/estabelecimentos/:id
 ```
 
-### Questionários
+### Inspeções
 ```
-GET    /api/questionarios
-GET    /api/questionarios/:id
-POST   /api/questionarios (admin)
-PUT    /api/questionarios/:id (admin)
-DELETE /api/questionarios/:id (admin)
-```
-
-### Auditorias
-```
-GET    /api/auditorias
-GET    /api/auditorias/:id
-POST   /api/auditorias
+GET  /api/inspecoes
+GET  /api/inspecoes/:id
+POST /api/inspecoes
+POST /api/inspecoes/:id/respostas
+PUT  /api/inspecoes/:id/finalizar
+PUT  /api/inspecoes/:id/cancelar
 ```
 
-## 🧪 Testando a API
-
-```bash
-# Health check
-curl https://seu-backend.onrender.com/health
-
-# Login
-curl -X POST https://seu-backend.onrender.com/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@visatech.com","password":"admin123"}'
-
-# Listar estabelecimentos (com token)
-curl https://seu-backend.onrender.com/api/estabelecimentos \
-  -H "Authorization: Bearer SEU_TOKEN_AQUI"
+### Inventário (Seção H)
+```
+GET  /api/inspecoes/:id/inventario
+POST /api/inspecoes/:id/inventario
 ```
 
-## 📱 App Android (Fase 2)
-
-O desenvolvimento do app Flutter está planejado para consumir a mesma API REST.
-
-### Features previstas:
-- Login offline-first
-- Cache de questionários
-- Respostas salvas localmente
-- Sincronização automática
-- Geração de PDF offline
-
-## 🤝 Contribuindo
-
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/nova-feature`)
-3. Commit suas mudanças (`git commit -m 'Add nova feature'`)
-4. Push para a branch (`git push origin feature/nova-feature`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto é de código aberto. Use como quiser! 
-
-## 🆘 Suporte
-
-- 📧 Email: suporte@visatech.com
-- 📚 Documentação: `/docs`
-- 🐛 Issues: GitHub Issues
-
-## ✅ Roadmap
-
-### Fase 1 - Backend + Web ✅
-- [x] API REST completa
-- [x] Autenticação JWT
-- [x] CRUD completo
-- [x] Painel web funcional
-- [x] Deploy automático
-
-### Fase 2 - App Android 🚧
-- [ ] Setup Flutter
-- [ ] Telas principais
-- [ ] Integração com API
-- [ ] Modo offline
-- [ ] Build APK
-
-### Fase 3 - Melhorias 📋
-- [ ] Geração de PDF dos relatórios
-- [ ] Dashboard com gráficos
-- [ ] Notificações push
-- [ ] Exportar Excel
-- [ ] Multi-idioma
-- [ ] Dark mode
-
-## 🎉 Status
-
-🟢 **Backend**: Produção  
-🟢 **Web Admin**: Produção  
-🟡 **App Android**: Desenvolvimento  
+### Health
+```
+GET /health  →  { status: 'ok', version: '2.0' }
+```
 
 ---
 
-**Desenvolvido para facilitar auditorias e inspeções** 🚀
+## 📋 Seções do Roteiro de Inspeção
+
+| Seção | Título | Tipo |
+|-------|--------|------|
+| A | Identificação do Estabelecimento | Dados + objetivo |
+| B | Responsabilidade Técnica | SIM/NÃO — **bloqueante** |
+| C | Administração | Documentos, POPs, registros |
+| D | Edificação e Instalações Físicas | SIM/NÃO/N.A./N.O. |
+| E | Armazenagem e Exposição | SIM/NÃO/N.A./N.O. |
+| F | Produtos | SIM/NÃO/N.A./N.O. |
+| G | Prestação de Serviços Farmacêuticos | SIM/NÃO/N.A./N.O. |
+| H | Medicamentos de Controle Especial | SIM/NÃO/N.A./N.O. + inventário |
+
+> A seção B é bloqueante: qualquer resposta **NÃO** encerra a inspeção com status `BLOQUEADA_B`.
+
+---
+
+## 🎨 Funcionalidades
+
+### App Android
+- Login com JWT
+- Busca de estabelecimento por CNPJ (cadastra automaticamente se não existir)
+- Fluxo de inspeção seção a seção (A → H)
+- Todos os tipos de campo: SIM/NÃO, SIM/NÃO/N.A./N.O., texto, data, checkboxes, tabelas
+- Histórico de inspeções com status colorido
+- Temas: Claro, Escuro, Feminino
+
+### Painel Web (Admin)
+- Login com JWT
+- Listagem de inspeções com status e detalhes por seção
+- CRUD de estabelecimentos
+- Cancelamento de inspeções
+
+---
+
+## 🔧 Instalação Local
+
+### Pré-requisitos
+- Node.js 18+
+- Flutter SDK 3.x
+- Conta no Supabase
+
+### Backend
+```bash
+cd backend
+npm install
+cp .env.example .env   # configurar DATABASE_URL e JWT_SECRET
+npm run dev
+```
+
+### Web Admin
+```bash
+cd web-admin
+npm install
+npm run dev            # http://localhost:5173
+```
+
+### App Flutter
+```bash
+cd app
+flutter pub get
+flutter run
+```
+
+---
+
+## 🚀 Deploy
+
+1. **Banco:** executar `schema.sql` no Supabase
+2. **Backend:** deploy no Render apontando para `backend/server.js`
+3. **Web Admin:** deploy no Vercel apontando para `web-admin/`
+
+Credenciais iniciais: `admin@visatech.com` / `admin123`
+
+---
+
+## 🔐 Segurança
+
+- Senhas com bcrypt (10 rounds)
+- Autenticação JWT com expiração de 24h
+- CORS configurado
+- Variáveis sensíveis em `.env`
+- SQL injection prevenido com prepared statements
+
+---
+
+## 🎉 Status
+
+| Componente | Status |
+|------------|--------|
+| Backend API | 🟢 Produção |
+| Web Admin | 🟢 Produção |
+| App Android | 🟢 Funcional |
