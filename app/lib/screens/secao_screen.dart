@@ -169,8 +169,11 @@ class _SecaoScreenState extends State<SecaoScreen> {
             ),
           ),
 
-        // Cabeçalho seção A: dados do estabelecimento
-        if (widget.secao.codigo == 'A') _cabecalhoEstabelecimento(theme),
+        // Cabeçalho seção A: título do roteiro + dados do estabelecimento
+        if (widget.secao.codigo == 'A') ...[
+          _cabecalhoRoteiro(theme),
+          _cabecalhoEstabelecimento(theme),
+        ],
 
         // Campos
         Expanded(
@@ -235,10 +238,46 @@ class _SecaoScreenState extends State<SecaoScreen> {
     );
   }
 
+  Widget _cabecalhoRoteiro(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ROTEIRO DE INSPEÇÃO EM ESTABELECIMENTOS FARMACÊUTICOS DE COMÉRCIO VAREJISTA (Drogarias)',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: theme.colorScheme.primary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'baseado na RDC 44/2009 – Boas Práticas Farmacêuticas',
+            style: TextStyle(
+              fontSize: 11,
+              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _cabecalhoEstabelecimento(ThemeData theme) {
     final i = widget.inspecao;
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: theme.colorScheme.primary.withOpacity(0.06),
@@ -248,16 +287,9 @@ class _SecaoScreenState extends State<SecaoScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
-            const SizedBox(width: 6),
-            Text('Estabelecimento',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: theme.colorScheme.primary)),
-          ]),
-          const SizedBox(height: 8),
-          _infoLinha('Razão Social', i.razaoSocial ?? '—'),
-          if (i.nomeFantasia?.isNotEmpty == true) _infoLinha('Nome Fantasia', i.nomeFantasia!),
-          _infoLinha('CNPJ', i.cnpj ?? '—'),
+          _infoLinha('Razão Social', i.razaoSocial?.isNotEmpty == true ? i.razaoSocial! : '—'),
+          _infoLinha('Nome Fantasia', i.nomeFantasia?.isNotEmpty == true ? i.nomeFantasia! : '—'),
+          _infoLinha('CNPJ', i.cnpj?.isNotEmpty == true ? i.cnpj! : '—'),
         ],
       ),
     );
@@ -384,7 +416,7 @@ class _SecaoScreenState extends State<SecaoScreen> {
           children: [
             Icon(Icons.calendar_today, size: 18, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
-            Text(display, style: TextStyle(fontSize: 14, color: valor == null ? Colors.grey : Colors.black87)),
+            Text(display, style: TextStyle(fontSize: 14, color: valor == null ? Colors.grey : theme.colorScheme.onSurface)),
           ],
         ),
       ),

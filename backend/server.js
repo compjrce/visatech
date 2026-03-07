@@ -290,11 +290,21 @@ app.post('/api/inspecoes', auth, async (req, res) => {
       }
     }
 
-    const result = await client.query(
+    const inserted = await client.query(
       `INSERT INTO inspecoes (estabelecimento_id, fiscal_id, status, secao_atual)
-       VALUES ($1, $2, 'EM_ANDAMENTO', 'A') RETURNING *`,
+       VALUES ($1, $2, 'EM_ANDAMENTO', 'A') RETURNING id`,
       [estabelecimento_id, req.user.id]
     );
+
+    // Busca com JOIN para retornar dados do estabelecimento já na criação
+    const result = await client.query(`
+      SELECT i.*, e.razao_social, e.nome_fantasia, e.cnpj,
+             u.nome as fiscal_nome
+      FROM inspecoes i
+      LEFT JOIN estabelecimentos e ON i.estabelecimento_id = e.id
+      LEFT JOIN users u ON i.fiscal_id = u.id
+      WHERE i.id = $1
+    `, [inserted.rows[0].id]);
 
     await client.query('COMMIT');
     res.status(201).json(result.rows[0]);

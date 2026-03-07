@@ -19,7 +19,7 @@ class AuthService {
       final result = await _apiService.login(email, password);
       
       _token = result['token'];
-      _currentUser = result['user'];
+      _currentUser = User.fromJson(result['user'] as Map<String, dynamic>);
       
       // Salvar token e usuário
       await _storage.write(key: 'auth_token', value: _token);

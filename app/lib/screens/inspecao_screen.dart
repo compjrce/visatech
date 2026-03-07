@@ -152,7 +152,7 @@ class _InspecaoScreenState extends State<InspecaoScreen> {
       onWillPop: _onWillPop,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.inspecao.nomeExibicao, overflow: TextOverflow.ellipsis),
+          title: const Text('VISATech', overflow: TextOverflow.ellipsis),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(5),
             child: LinearProgressIndicator(
