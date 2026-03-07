@@ -372,7 +372,7 @@ app.post('/api/inspecoes/:id/respostas', auth, async (req, res) => {
     }
 
     await client.query('COMMIT');
-    res.json({ success: true, status: novoStatus, secao_b_aprovada });
+    res.json({ success: true, status: novoStatus, secao_b_aprovada: secaoB_aprovada });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err);
